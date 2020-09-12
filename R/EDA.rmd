@@ -1,0 +1,38 @@
+---
+title: "EDA"
+author: "Johannes Wagner"
+date: "9/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview Dataset STAR
+
+We load the data from [harvard.com](https://dataverse.harvard.edu/dataset.xhtml?persistentId=hdl:1902.1/10766)
+
+```{r echo=FALSE, include=FALSE}
+load("/home/hanes/Documents/Projects/2020_Master_STAR/Data/STAR_Students.RData")
+```
+
+- 11.602 Students by ID
+
+## Core Data
+
+- Demographics
+- School and class identifiers
+- school teacher information
+- Experimental condition (“class type”)
+- Norm-referenced and criterion-referenced achievement test scores
+- Motivation and self-concept scores.
+
+### Additional Data
+
+- Achievement test scores for the students when they were in grades 4 – 8, obtained from the Tennessee State Department of Education
+- Teachers’ ratings of student behavior in grades 4 and 8
+- Students’ self-reports of school engagement and peer effects in grade 8
+- Course taking in mathematics, science, and foreign language in high school, obtained from student transcripts
+- SAT/ACT participation and scores, obtained from ACT, Inc. and from Educational Testing Service
+- Graduation/dropout information, obtained from high school transcripts and the Tennessee State Department of Education
