@@ -189,6 +189,66 @@ window.buildTabsets = function(tocID) {
 };
 
 </script>
+<script>
+window.initializeCodeFolding = function(show) {
+
+  // handlers for show-all and hide all
+  $("#rmd-show-all-code").click(function() {
+    $('div.r-code-collapse').each(function() {
+      $(this).collapse('show');
+    });
+  });
+  $("#rmd-hide-all-code").click(function() {
+    $('div.r-code-collapse').each(function() {
+      $(this).collapse('hide');
+    });
+  });
+
+  // index for unique code element ids
+  var currentIndex = 1;
+
+  // select all R code blocks
+  var rCodeBlocks = $('pre.r, pre.python, pre.bash, pre.sql, pre.cpp, pre.stan, pre.julia');
+  rCodeBlocks.each(function() {
+
+    // create a collapsable div to wrap the code in
+    var div = $('<div class="collapse r-code-collapse"></div>');
+    if (show || $(this)[0].classList.contains('fold-show'))
+      div.addClass('in');
+    var id = 'rcode-643E0F36' + currentIndex++;
+    div.attr('id', id);
+    $(this).before(div);
+    $(this).detach().appendTo(div);
+
+    // add a show code button right above
+    var showCodeText = $('<span>' + (show ? 'Hide' : 'Code') + '</span>');
+    var showCodeButton = $('<button type="button" class="btn btn-default btn-xs code-folding-btn pull-right"></button>');
+    showCodeButton.append(showCodeText);
+    showCodeButton
+        .attr('data-toggle', 'collapse')
+        .attr('data-target', '#' + id)
+        .attr('aria-expanded', show)
+        .attr('aria-controls', id);
+
+    var buttonRow = $('<div class="row"></div>');
+    var buttonCol = $('<div class="col-md-12"></div>');
+
+    buttonCol.append(showCodeButton);
+    buttonRow.append(buttonCol);
+
+    div.before(buttonRow);
+
+    // update state of button on show/hide
+    div.on('hidden.bs.collapse', function () {
+      showCodeText.text('Code');
+    });
+    div.on('show.bs.collapse', function () {
+      showCodeText.text('Hide');
+    });
+  });
+
+}
+</script>
 <style type="text/css">.hljs-literal {
 color: #990073;
 }
@@ -344,6 +404,9 @@ summary {
 </style>
 
 <!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
 
 
 
@@ -360,6 +423,14 @@ summary {
 
 <div class="fluid-row" id="header">
 
+<div class="btn-group pull-right">
+<button type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
 
 
 <h1 class="title toc-ignore">EDA</h1>
@@ -368,6 +439,59 @@ summary {
 
 </div>
 
+<div id="TOC">
+<ul>
+<li><a href="#overview-dataset-star">Overview Dataset STAR</a><ul>
+<li><a href="#core-data">Core Data</a><ul>
+<li><a href="#additional-data">Additional Data</a></li>
+</ul></li>
+<li><a href="#first-check">First check</a></li>
+<li><a href="#core-variables-demographics">Core Variables: Demographics</a><ul>
+<li><a href="#id">ID</a></li>
+<li><a href="#gender">Gender</a></li>
+<li><a href="#race">race</a></li>
+<li><a href="#free-lunch">free lunch</a></li>
+</ul></li>
+<li><a href="#performence">Performence</a><ul>
+<li><a href="#repetition-of-class">Repetition of class</a></li>
+<li><a href="#special-education">Special Education</a></li>
+<li><a href="#reading-skills">Reading Skills</a></li>
+<li><a href="#self-evalaluation">Self evalaluation</a></li>
+<li><a href="#math-skills">Math Skills</a></li>
+<li><a href="#listening-skills">Listening Skills</a></li>
+<li><a href="#word-skills">Word Skills</a></li>
+<li><a href="#motivation">Motivation</a></li>
+<li><a href="#satact-scores">SAT/ACT Scores</a></li>
+</ul></li>
+<li><a href="#kindergarten-characteristics">Kindergarten characteristics</a><ul>
+<li><a href="#absent-time">Absent time</a></li>
+<li><a href="#urbanrural">urban/rural</a></li>
+<li><a href="#years-in-kindergarten">years in kindergarten</a></li>
+</ul></li>
+<li><a href="#school-characteristics">School characteristics</a><ul>
+<li><a href="#school-id">school ID</a></li>
+<li><a href="#urbanrural-1">urban/rural</a></li>
+</ul></li>
+<li><a href="#teacher-characteristics">Teacher characteristics</a><ul>
+<li><a href="#gender-1">Gender</a></li>
+<li><a href="#high-school-degree">High School Degree</a></li>
+<li><a href="#race-1">Race</a></li>
+<li><a href="#career-level">Career Level</a></li>
+<li><a href="#experience-level">Experience Level</a></li>
+</ul></li>
+<li><a href="#core-variables-design">Core Variables: Design</a><ul>
+<li><a href="#level-of-entryparticipation">Level of Entry/Participation</a></li>
+<li><a href="#flags-for-achievement-data">Flags for achievement Data</a></li>
+<li><a href="#flags-for-further-participation-studies">Flags for further participation Studies</a></li>
+<li><a href="#class-room-type-core-treatment">Class Room Type (<strong>core Treatment</strong>)</a></li>
+<li><a href="#flags-for-composition-mobility-of-students">Flags for Composition (mobility of students)</a></li>
+</ul></li>
+<li><a href="#probably-not-relevant">Probably not relevant</a><ul>
+<li><a href="#birthmonth-birthday">birthmonth, birthday</a></li>
+</ul></li>
+</ul></li>
+</ul>
+</div>
 
 <div id="overview-dataset-star" class="section level1">
 <h1>Overview Dataset STAR</h1>
@@ -395,6 +519,1184 @@ summary {
 <li>SAT/ACT participation and scores, obtained from ACT, Inc. and from Educational Testing Service</li>
 <li>Graduation/dropout information, obtained from high school transcripts and the Tennessee State Department of Education</li>
 </ul>
+</div>
+</div>
+<div id="first-check" class="section level2">
+<h2>First check</h2>
+<p>Variables by name and values</p>
+<p>All variables:</p>
+<pre class="r"><code>list &lt;- attributes(x)
+list$orig.names</code></pre>
+<pre><code>##   [1] &quot;STUDENT ID&quot;                                                                   
+##   [2] &quot;STUDENT GENDER&quot;                                                               
+##   [3] &quot;STUDENT RACE/ETHNICITY&quot;                                                       
+##   [4] &quot;STUDENT MONTH OF BIRTH&quot;                                                       
+##   [5] &quot;STUDENT DAY OF BIRTH&quot;                                                         
+##   [6] &quot;STUDENT YEAR OF BIRTH&quot;                                                        
+##   [7] &quot;IN STAR IN KINDERGARTEN&quot;                                                      
+##   [8] &quot;IN STAR IN GRADE 1&quot;                                                           
+##   [9] &quot;IN STAR IN GRADE 2&quot;                                                           
+##  [10] &quot;IN STAR IN GRADE 3&quot;                                                           
+##  [11] &quot;ACHIEVEMENT DATA AVAILABLE GRADE K&quot;                                           
+##  [12] &quot;ACHIEVEMENT DATA AVAILABLE GRADE 1&quot;                                           
+##  [13] &quot;ACHIEVEMENT DATA AVAILABLE GRADE 2&quot;                                           
+##  [14] &quot;ACHIEVEMENT DATA AVAILABLE GRADE 3&quot;                                           
+##  [15] &quot;ACHIEVEMENT DATA AVAILABLE GRADE 4&quot;                                           
+##  [16] &quot;ACHIEVEMENT DATA AVAILABLE GRADE 5&quot;                                           
+##  [17] &quot;ACHIEVEMENT DATA AVAILABLE GRADE 6&quot;                                           
+##  [18] &quot;ACHIEVEMENT DATA AVAILABLE GRADE 7&quot;                                           
+##  [19] &quot;ACHIEVEMENT DATA AVAILABLE GRADE 8&quot;                                           
+##  [20] &quot;IN PARTICIPATION STUDY GRADE 4&quot;                                               
+##  [21] &quot;IN IDENTIFICATION STUDY GRADE 8&quot;                                              
+##  [22] &quot;IN PARTICIPATION STUDY GRADE 8&quot;                                               
+##  [23] &quot;VALID SAT/ACT SCORE AVAILABLE&quot;                                                
+##  [24] &quot;AT LEAST ONE YEAR OF HIGH SCHOOL COURSE DATA AVAILABLE&quot;                       
+##  [25] &quot;DATA ON HIGH SCHOOL GRADUATION STATUS AVAILABLE&quot;                              
+##  [26] &quot;CLASSROOM TYPE KINDERGARTEN&quot;                                                  
+##  [27] &quot;CLASSROOM TYPE GRADE 1&quot;                                                       
+##  [28] &quot;CLASSROOM TYPE GRADE 2&quot;                                                       
+##  [29] &quot;CLASSROOM TYPE GRADE 3&quot;                                                       
+##  [30] &quot;CLASS TYPE COMPOSITE&quot;                                                         
+##  [31] &quot;DURATION COMPOSITE&quot;                                                           
+##  [32] &quot;NUMBER OF YEARS IN STAR&quot;                                                      
+##  [33] &quot;NUMBER OF YEARS IN SMALL CLASSES&quot;                                             
+##  [34] &quot;KINDERGARTEN SCHOOL ID&quot;                                                       
+##  [35] &quot;SCHOOL URBANICITY KINDERGARTEN&quot;                                               
+##  [36] &quot;KINDERGARTEN TEACHER ID&quot;                                                      
+##  [37] &quot;TEACHER GENDER KINDERGARTEN&quot;                                                  
+##  [38] &quot;TEACHER RACE/ETHNICITY KINDERGARTEN&quot;                                          
+##  [39] &quot;TEACHER HIGHEST DEGREE KINDERGARTEN&quot;                                          
+##  [40] &quot;TEACHER CAREER LADDER LEVEL KINDERGARTEN&quot;                                     
+##  [41] &quot;YEARS OF TOTAL TEACHING EXPERIENCE KINDERGARTEN&quot;                              
+##  [42] &quot;CLASS SIZE KINDERGARTEN&quot;                                                      
+##  [43] &quot;FREE/REDUCED LUNCH STATUS KINDERGARTEN&quot;                                       
+##  [44] &quot;REPEATING KINDERGARTEN IN 1985-1986 SCHOOL YEAR&quot;                              
+##  [45] &quot;SPECIAL EDUCATION STATUS KINDERGARTEN&quot;                                        
+##  [46] &quot;PULLED OUT FOR SPECIAL INSTRUCTION KINDERGARTEN&quot;                              
+##  [47] &quot;DAYS PRESENT AT SCHOOL KINDERGARTEN&quot;                                          
+##  [48] &quot;DAYS ABSENT FROM SCHOOL KINDERGARTEN&quot;                                         
+##  [49] &quot;TOTAL READING SCALE SCORE SAT KINDERGARTEN&quot;                                   
+##  [50] &quot;TOTAL MATH SCALE SCORE SAT KINDERGARTEN&quot;                                      
+##  [51] &quot;TOTAL LISTENING SCALE SCORE SAT KINDERGARTEN&quot;                                 
+##  [52] &quot;WORD STUDY SKILLS SCALE SCORE SAT KINDERGARTEN&quot;                               
+##  [53] &quot;MOTIVATION RAW SCORE SCAMIN KINDERGARTEN&quot;                                     
+##  [54] &quot;SELF-CONCEPT RAW SCORE SCAMIN KINDERGARTEN&quot;                                   
+##  [55] &quot;GRADE 1 SCHOOL ID&quot;                                                            
+##  [56] &quot;SCHOOL URBANICITY GRADE 1&quot;                                                    
+##  [57] &quot;GRADE 1 TEACHER ID&quot;                                                           
+##  [58] &quot;TEACHER GENDER GRADE 1&quot;                                                       
+##  [59] &quot;TEACHER RACE/ETHNICITY GRADE 1&quot;                                               
+##  [60] &quot;TEACHER HIGHEST DEGREE GRADE 1&quot;                                               
+##  [61] &quot;TEACHER CAREER LADDER LEVEL GRADE 1&quot;                                          
+##  [62] &quot;YEARS OF TOTAL TEACHING EXPERIENCE GRADE 1&quot;                                   
+##  [63] &quot;CLASS SIZE GRADE 1&quot;                                                           
+##  [64] &quot;FREE/REDUCED LUNCH STATUS GRADE 1&quot;                                            
+##  [65] &quot;RECOMMENDED FOR PROMOTION FROM GRADE 1 TO GRADE 2&quot;                            
+##  [66] &quot;SPECIAL EDUCATION STATUS GRADE 1&quot;                                             
+##  [67] &quot;PULLED OUT FOR SPECIAL INSTRUCTION GRADE 1&quot;                                   
+##  [68] &quot;DAYS PRESENT AT SCHOOL GRADE 1&quot;                                               
+##  [69] &quot;DAYS ABSENT FROM SCHOOL GRADE 1&quot;                                              
+##  [70] &quot;TOTAL READING SCALE SCORE SAT GRADE 1&quot;                                        
+##  [71] &quot;TOTAL MATH SCALE SCORE SAT GRADE 1&quot;                                           
+##  [72] &quot;TOTAL LISTENING SCALE SCORE SAT GRADE 1&quot;                                      
+##  [73] &quot;WORD STUDY SKILLS SCALE SCORE SAT GRADE 1&quot;                                    
+##  [74] &quot;READING RAW SCORE BSF GRADE 1&quot;                                                
+##  [75] &quot;MATH RAW SCORE BSF GRADE 1&quot;                                                   
+##  [76] &quot;READING NUMBER OBJECTIVES MASTERED BSF GRADE 1&quot;                               
+##  [77] &quot;MATH NUMBER OBJECTIVES MASTERED BSF GRADE 1&quot;                                  
+##  [78] &quot;READING PERCENT OBJECTIVES MASTERED BSF GRADE 1&quot;                              
+##  [79] &quot;MATH PERCENT OBJECTIVES MASTERED BSF GRADE 1&quot;                                 
+##  [80] &quot;MOTIVATION RAW SCORE SCAMIN GRADE 1&quot;                                          
+##  [81] &quot;SELF-CONCEPT RAW SCORE SCAMIN GRADE 1&quot;                                        
+##  [82] &quot;GRADE 2 SCHOOL ID&quot;                                                            
+##  [83] &quot;SCHOOL URBANICITY GRADE 2&quot;                                                    
+##  [84] &quot;GRADE 2 TEACHER ID&quot;                                                           
+##  [85] &quot;TEACHER GENDER GRADE 2&quot;                                                       
+##  [86] &quot;TEACHER RACE/ETHNICITY GRADE 2&quot;                                               
+##  [87] &quot;TEACHER HIGHEST DEGREE GRADE 2&quot;                                               
+##  [88] &quot;TEACHER CAREER LADDER LEVEL GRADE 2&quot;                                          
+##  [89] &quot;YEARS OF TOTAL TEACHING EXPERIENCE GRADE 2&quot;                                   
+##  [90] &quot;ATTEND STAR TEACHER TRAINING GRADE 2&quot;                                         
+##  [91] &quot;CLASS SIZE GRADE 2&quot;                                                           
+##  [92] &quot;FREE/REDUCED LUNCH STATUS GRADE 2&quot;                                            
+##  [93] &quot;RECOMMENDED FOR PROMOTION FROM GRADE 2 TO GRADE 3&quot;                            
+##  [94] &quot;TOTAL READING SCALE SCORE SAT GRADE 2&quot;                                        
+##  [95] &quot;TOTAL MATH SCALE SCORE SAT GRADE 2&quot;                                           
+##  [96] &quot;TOTAL LISTENING SCALE SCORE SAT GRADE 2&quot;                                      
+##  [97] &quot;WORD STUDY SKILLS SCALE SCORE SAT GRADE 2&quot;                                    
+##  [98] &quot;READING RAW SCORE BSF GRADE 2&quot;                                                
+##  [99] &quot;MATH RAW SCORE BSF GRADE 2&quot;                                                   
+## [100] &quot;READING NUMBER OBJECTIVES MASTERED BSF GRADE 2&quot;                               
+## [101] &quot;MATH NUMBER OBJECTIVES MASTERED BSF GRADE 2&quot;                                  
+## [102] &quot;READING PERCENT OBJECTIVES MASTERED BSF GRADE 2&quot;                              
+## [103] &quot;MATH PERCENT OBJECTIVES MASTERED BSF GRADE 2&quot;                                 
+## [104] &quot;MOTIVATION RAW SCORE SCAMIN GRADE 2&quot;                                          
+## [105] &quot;SELF-CONCEPT RAW SCORE SCAMIN GRADE 2&quot;                                        
+## [106] &quot;GRADE 3 SCHOOL ID&quot;                                                            
+## [107] &quot;SCHOOL URBANICITY GRADE 3&quot;                                                    
+## [108] &quot;GRADE 3 TEACHER ID&quot;                                                           
+## [109] &quot;TEACHER GENDER GRADE 3&quot;                                                       
+## [110] &quot;TEACHER RACE/ETHNICITY GRADE 3&quot;                                               
+## [111] &quot;TEACHER HIGHEST DEGREE GRADE 3&quot;                                               
+## [112] &quot;TEACHER CAREER LADDER LEVEL GRADE 3&quot;                                          
+## [113] &quot;YEARS OF TOTAL TEACHING EXPERIENCE GRADE 3&quot;                                   
+## [114] &quot;ATTEND STAR TEACHER TRAINING GRADE 3&quot;                                         
+## [115] &quot;CLASS SIZE GRADE 3&quot;                                                           
+## [116] &quot;FREE/REDUCED LUNCH STATUS GRADE 3&quot;                                            
+## [117] &quot;RECOMMENDED FOR PROMOTION FROM GRADE 3 TO GRADE 4&quot;                            
+## [118] &quot;DAYS PRESENT AT SCHOOL GRADE 3&quot;                                               
+## [119] &quot;DAYS ABSENT FROM SCHOOL GRADE 3&quot;                                              
+## [120] &quot;TOTAL READING SCALE SCORE SAT GRADE 3&quot;                                        
+## [121] &quot;TOTAL MATH SCALE SCORE SAT GRADE 3&quot;                                           
+## [122] &quot;TOTAL LANGUAGE SCALE SCORE SAT GRADE 3&quot;                                       
+## [123] &quot;TOTAL LISTENING SCALE SCORE SAT GRADE 3&quot;                                      
+## [124] &quot;SCIENCE SCALE SCORE SAT GRADE 3&quot;                                              
+## [125] &quot;SOCIAL SCIENCE SCALE SCORE SAT GRADE 3&quot;                                       
+## [126] &quot;SPELLING SCALE SCORE SAT GRADE 3&quot;                                             
+## [127] &quot;VOCABULARY SCALE SCORE SAT GRADE 3&quot;                                           
+## [128] &quot;MATH COMPUTATION SCALE SCORE SAT GRADE 3&quot;                                     
+## [129] &quot;CONCEPT OF NUMBERS SCALE SCORE SAT GRADE 3&quot;                                   
+## [130] &quot;MATH APPLICATIONS SCALE SCORE SAT GRADE 3&quot;                                    
+## [131] &quot;WORD STUDY SKILLS SCALE SCORE SAT GRADE 3&quot;                                    
+## [132] &quot;READING RAW SCORE BSF GRADE 3&quot;                                                
+## [133] &quot;MATH RAW SCORE BSF GRADE 3&quot;                                                   
+## [134] &quot;READING NUMBER OBJECTIVES MASTERED BSF GRADE 3&quot;                               
+## [135] &quot;MATH NUMBER OBJECTIVES MASTERED BSF GRADE 3&quot;                                  
+## [136] &quot;READING PERCENT OBJECTIVES MASTERED BSF GRADE 3&quot;                              
+## [137] &quot;MATH PERCENT OBJECTIVES MASTERED BSF GRADE 3&quot;                                 
+## [138] &quot;MOTIVATION RAW SCORE SCAMIN GRADE 3&quot;                                          
+## [139] &quot;SELF-CONCEPT RAW SCORE SCAMIN GRADE 3&quot;                                        
+## [140] &quot;GRADE 4 SCHOOL ID&quot;                                                            
+## [141] &quot;SCHOOL URBANICITY GRADE 4&quot;                                                    
+## [142] &quot;GRADE 4 TEACHER ID&quot;                                                           
+## [143] &quot;TEACHER GENDER GRADE 4&quot;                                                       
+## [144] &quot;TEACHER RACE/ETHNICITY GRADE 4&quot;                                               
+## [145] &quot;NUMBER STUDENTS CLASS ROSTER GRADE 4&quot;                                         
+## [146] &quot;NUMBER WHITE STUDENTS CLASS ROSTER GRADE 4&quot;                                   
+## [147] &quot;NUMBER BLACK STUDENTS CLASS ROSTER GRADE 4&quot;                                   
+## [148] &quot;NUMBER OTHER RACE/ETHNICITY STUDENTS CLASS ROSTER GRADE 4&quot;                    
+## [149] &quot;PERCENT NON-WHITE STUDENTS IN CLASSROOM&quot;                                      
+## [150] &quot;NUMBER STUDENTS ON FREE-REDUCED LUNCH CLASS ROSTER GRADE 4&quot;                   
+## [151] &quot;TOTAL READING SCALE SCORE CTBS GRADE 4&quot;                                       
+## [152] &quot;TOTAL MATH SCALE SCORE CTBS GRADE 4&quot;                                          
+## [153] &quot;TOTAL LANGUAGE SCALE SCORE CTBS GRADE 4&quot;                                      
+## [154] &quot;TOTAL BATTERY SCALE SCORE CTBS GRADE 4&quot;                                       
+## [155] &quot;SCIENCE SCALE SCORE CTBS GRADE 4&quot;                                             
+## [156] &quot;SOCIAL SCIENCE SCALE SCORE CTBS GRADE 4&quot;                                      
+## [157] &quot;READING COMPREHENSION SCALE SCORE CTBS GRADE 4&quot;                               
+## [158] &quot;SPELLING SCALE SCORE CTBS GRADE 4&quot;                                            
+## [159] &quot;VOCABULARY SCALE SCORE CTBS GRADE 4&quot;                                          
+## [160] &quot;MATH COMPUTATION SCALE SCORE CTBS GRADE 4&quot;                                    
+## [161] &quot;MATH CONCEPTS AND APPLICATIONS SCALE SCORE CTBS GRADE 4&quot;                      
+## [162] &quot;LANGUAGE EXPRESSION SCALE SCORE CTBS GRADE 4&quot;                                 
+## [163] &quot;LANGUAGE MECHANICS SCALE SCORE CTBS GRADE 4&quot;                                  
+## [164] &quot;STUDY SKILLS SCALE SCORE CTBS GRADE 4&quot;                                        
+## [165] &quot;READING NUMBER OBJECTIVES MASTERED BSF GRADE 4&quot;                               
+## [166] &quot;MATH NUMBER OBJECTIVES MASTERED BSF GRADE 4&quot;                                  
+## [167] &quot;GRADE 4 PARTICIPATION: PAYS ATTENTION IN CLASS&quot;                               
+## [168] &quot;GRADE 4 PARTICIPATION: COMPLETES HOMEWORK ON TIME&quot;                            
+## [169] &quot;GRADE 4 PARTICIPATION: WORKS WELL WITH OTHERS&quot;                                
+## [170] &quot;GRADE 4 PARTICIPATION: LOSES MATERIALS&quot;                                       
+## [171] &quot;GRADE 4 PARTICIPATION: COMES LATE TO CLASS&quot;                                   
+## [172] &quot;GRADE 4 PARTICIPATION: TRIES TO DO WORK WELL&quot;                                 
+## [173] &quot;GRADE 4 PARTICIPATION: ACTS RESTLESS&quot;                                         
+## [174] &quot;GRADE 4 PARTICIPATION: PARTICIPATES IN DISCUSSIONS&quot;                           
+## [175] &quot;GRADE 4 PARTICIPATION: COMPLETES SEAT WORK&quot;                                   
+## [176] &quot;GRADE 4 PARTICIPATION: THINKS SCHOOL IS IMPORTANT&quot;                            
+## [177] &quot;GRADE 4 PARTICIPATION: NEEDS REPRIMANDING&quot;                                    
+## [178] &quot;GRADE 4 PARTICIPATION: ANNOYS OTHERS&quot;                                         
+## [179] &quot;GRADE 4 PARTICIPATION: IS PERSISTENT&quot;                                         
+## [180] &quot;GRADE 4 PARTICIPATION: DOESN'T KNOW WHAT'S GOING ON&quot;                          
+## [181] &quot;GRADE 4 PARTICIPATION: DOES EXTRA WORK&quot;                                       
+## [182] &quot;GRADE 4 PARTICIPATION: IS WITHDRAWN&quot;                                          
+## [183] &quot;GRADE 4 PARTICIPATION: MAKES EFFORT&quot;                                          
+## [184] &quot;GRADE 4 PARTICIPATION: IS CRITICAL OF ACHIEVERS&quot;                              
+## [185] &quot;GRADE 4 PARTICIPATION: ASKS QUESTIONS&quot;                                        
+## [186] &quot;GRADE 4 PARTICIPATION: TALKS TOO MUCH&quot;                                        
+## [187] &quot;GRADE 4 PARTICIPATION: LACKS INITIATIVE&quot;                                      
+## [188] &quot;GRADE 4 PARTICIPATION: PREFERS EASY PROBLEMS&quot;                                 
+## [189] &quot;GRADE 4 PARTICIPATION: CRITICIZES SUBJECT MATTER&quot;                             
+## [190] &quot;GRADE 4 PARTICIPATION: TRIES TO FINISH DIFFICULT WORK&quot;                        
+## [191] &quot;GRADE 4 PARTICIPATION: RAISES HAND TO TALK&quot;                                   
+## [192] &quot;GRADE 4 PARTICIPATION: SEEKS REFERENCE MATERIAL&quot;                              
+## [193] &quot;GRADE 4 PARTICIPATION: IS EASILY DISCOURAGED&quot;                                 
+## [194] &quot;GRADE 4 PARTICIPATION: DISCUSSES SUBJECT MATTER OUTSIDE OF CLASS&quot;             
+## [195] &quot;GRADE 4 PARTICIPATION: ATTENDS EXTRACURRICULAR ACTIVITIES&quot;                    
+## [196] &quot;GRADE 4 PARTICIPATION: OVERALL ACADEMIC PERFORMANCE&quot;                          
+## [197] &quot;GRADE 4 PARTICIPATION: ATTENDS SPECIAL EDUCATION&quot;                             
+## [198] &quot;GRADE 4 PARTICIPATION SUBSCORE: EFFORT&quot;                                       
+## [199] &quot;GRADE 4 PARTICIPATION SUBSCORE: INITIATIVE&quot;                                   
+## [200] &quot;GRADE 4 PARTICIPATION SUBSCORE: NONPARTICIPATORY BEHAVIOR&quot;                    
+## [201] &quot;GRADE 4 PARTICIPATION SUBSCORE: VALUE&quot;                                        
+## [202] &quot;GRADE 5 SCHOOL ID&quot;                                                            
+## [203] &quot;TOTAL READING SCALE SCORE CTBS GRADE 5&quot;                                       
+## [204] &quot;TOTAL MATH SCALE SCORE CTBS GRADE 5&quot;                                          
+## [205] &quot;TOTAL LANGUAGE SCALE SCORE CTBS GRADE 5&quot;                                      
+## [206] &quot;TOTAL BATTERY SCALE SCORE CTBS GRADE 5&quot;                                       
+## [207] &quot;SCIENCE SCALE SCORE CTBS GRADE 5&quot;                                             
+## [208] &quot;SOCIAL SCIENCE SCALE SCORE CTBS GRADE 5&quot;                                      
+## [209] &quot;READING COMPREHENSION SCALE SCORE CTBS GRADE 5&quot;                               
+## [210] &quot;SPELLING SCALE SCORE CTBS GRADE 5&quot;                                            
+## [211] &quot;VOCABULARY SCALE SCORE CTBS GRADE 5&quot;                                          
+## [212] &quot;MATH COMPUTATION SCALE SCORE CTBS GRADE 5&quot;                                    
+## [213] &quot;MATH CONCEPTS AND APPLICATIONS SCALE SCORE CTBS GRADE 5&quot;                      
+## [214] &quot;LANGUAGE EXPRESSION SCALE SCORE CTBS GRADE 5&quot;                                 
+## [215] &quot;LANGUAGE MECHANICS SCALE SCORE CTBS GRADE 5&quot;                                  
+## [216] &quot;STUDY SKILLS SCALE SCORE CTBS GRADE 5&quot;                                        
+## [217] &quot;READING NUMBER OBJECTIVES MASTERED BSF GRADE 5&quot;                               
+## [218] &quot;MATH NUMBER OBJECTIVES MASTERED BSF GRADE 5&quot;                                  
+## [219] &quot;GRADE 6 SCHOOL ID&quot;                                                            
+## [220] &quot;TOTAL READING SCALE SCORE CTBS GRADE 6&quot;                                       
+## [221] &quot;TOTAL MATH SCALE SCORE CTBS GRADE 6&quot;                                          
+## [222] &quot;TOTAL LANGUAGE SCALE SCORE CTBS GRADE 6&quot;                                      
+## [223] &quot;SCIENCE SCALE SCORE CTBS GRADE 6&quot;                                             
+## [224] &quot;SOCIAL SCIENCE SCALE SCORE CTBS GRADE 6&quot;                                      
+## [225] &quot;READING NUMBER OBJECTIVES MASTERED BSF GRADE 6&quot;                               
+## [226] &quot;MATH NUMBER OBJECTIVES MASTERED BSF GRADE 6&quot;                                  
+## [227] &quot;GRADE 7 SCHOOL ID&quot;                                                            
+## [228] &quot;TOTAL READING SCALE SCORE CTBS GRADE 7&quot;                                       
+## [229] &quot;TOTAL MATH SCALE SCORE CTBS GRADE 7&quot;                                          
+## [230] &quot;TOTAL LANGUAGE SCALE SCORE CTBS GRADE 7&quot;                                      
+## [231] &quot;TOTAL BATTERY SCALE SCORE CTBS GRADE 7&quot;                                       
+## [232] &quot;SCIENCE SCALE SCORE CTBS GRADE 7&quot;                                             
+## [233] &quot;SOCIAL SCIENCE SCALE SCORE CTBS GRADE 7&quot;                                      
+## [234] &quot;READING COMPREHENSION SCALE SCORE CTBS GRADE 7&quot;                               
+## [235] &quot;SPELLING SCALE SCORE CTBS GRADE 7&quot;                                            
+## [236] &quot;VOCABULARY SCALE SCORE CTBS GRADE 7&quot;                                          
+## [237] &quot;MATH COMPUTATION SCALE SCORE CTBS GRADE 7&quot;                                    
+## [238] &quot;MATH CONCEPTS AND APPLICATIONS SCALE SCORE CTBS GRADE 7&quot;                      
+## [239] &quot;LANGUAGE EXPRESSION SCALE SCORE CTBS GRADE 7&quot;                                 
+## [240] &quot;LANGUAGE MECHANICS SCALE SCORE CTBS GRADE 7&quot;                                  
+## [241] &quot;STUDY SKILLS SCALE SCORE CTBS GRADE 7&quot;                                        
+## [242] &quot;READING NUMBER OBJECTIVES MASTERED BSF GRADE 7&quot;                               
+## [243] &quot;MATH NUMBER OBJECTIVES MASTERED BSF GRADE 7&quot;                                  
+## [244] &quot;GRADE 8 SCHOOL ID&quot;                                                            
+## [245] &quot;SCHOOL URBANICITY GRADE 8&quot;                                                    
+## [246] &quot;TOTAL READING SCALE SCORE CTBS GRADE 8&quot;                                       
+## [247] &quot;TOTAL MATH SCALE SCORE CTBS GRADE 8&quot;                                          
+## [248] &quot;TOTAL LANGUAGE SCALE SCORE CTBS GRADE 8&quot;                                      
+## [249] &quot;TOTAL BATTERY SCALE SCORE CTBS GRADE 8&quot;                                       
+## [250] &quot;SCIENCE SCALE SCORE CTBS GRADE 8&quot;                                             
+## [251] &quot;SOCIAL SCIENCE SCALE SCORE CTBS GRADE 8&quot;                                      
+## [252] &quot;READING COMPREHENSION SCALE SCORE CTBS GRADE 8&quot;                               
+## [253] &quot;SPELLING SCALE SCORE CTBS GRADE 8&quot;                                            
+## [254] &quot;VOCABULARY SCALE SCORE CTBS GRADE 8&quot;                                          
+## [255] &quot;MATH COMPUTATION SCALE SCORE CTBS GRADE 8&quot;                                    
+## [256] &quot;MATH CONCEPTS AND APPLICATIONS SCALE SCORE CTBS GRADE 8&quot;                      
+## [257] &quot;LANGUAGE EXPRESSION SCALE SCORE CTBS GRADE 8&quot;                                 
+## [258] &quot;LANGUAGE MECHANICS SCALE SCORE CTBS GRADE 8&quot;                                  
+## [259] &quot;STUDY SKILLS SCALE SCORE CTBS GRADE 8&quot;                                        
+## [260] &quot;READING NUMBER OBJECTIVES MASTERED BSF GRADE 8&quot;                               
+## [261] &quot;MATH NUMBER OBJECTIVES MASTERED BSF GRADE 8&quot;                                  
+## [262] &quot;GRADE 8 IDENTIFICATION: I FEEL PROUD BEING PART OF SCHOOL&quot;                    
+## [263] &quot;GRADE 8 IDENTIFICATION: I AM TREATED WITH RESPECT&quot;                            
+## [264] &quot;GRADE 8 IDENTIFICATION: I CAN GET A GOOD JOB EVEN IF GRADES BAD&quot;              
+## [265] &quot;GRADE 8 IDENTIFICATION: I ONLY GET ATTENTION WHEN I CAUSE TROUBLE&quot;            
+## [266] &quot;GRADE 8 IDENTIFICATION: I PARTICIPATE IN A LOT OF ACTIVITIES AT SCHOOL&quot;       
+## [267] &quot;GRADE 8 IDENTIFICATION: SCHOOL IS IMPORTANT IN MY LIFE&quot;                       
+## [268] &quot;GRADE 8 IDENTIFICATION: I AM LESS POPULAR WHEN I GET BETTER GRADES&quot;           
+## [269] &quot;GRADE 8 IDENTIFICATION: WHAT WE LEARN IN CLASS IS USELESS&quot;                    
+## [270] &quot;GRADE 8 IDENTIFICATION: MY FRIENDS LIKE SCHOOL A LOT&quot;                         
+## [271] &quot;GRADE 8 IDENTIFICATION: MY TEACHERS DONT CARE ABOUT ME&quot;                       
+## [272] &quot;GRADE 8 IDENTIFICATION: I LIKE BEING ANY PLACE OTHER THAN SCHOOL&quot;             
+## [273] &quot;GRADE 8 IDENTIFICATION: I CAN TALK TO TEACHERS ABOUT PROBLEMS&quot;                
+## [274] &quot;GRADE 8 IDENTIFICATION: WHAT WE LEARN IN SCHOOL WILL BE USEFUL ON JOB&quot;        
+## [275] &quot;GRADE 8 IDENTIFICATION: MY FRIENDS DONT CARE ABOUT BAD GRADES&quot;                
+## [276] &quot;GRADE 8 IDENTIFICATION: TRYING HARD MAKES OTHERS DISLIKE ME&quot;                  
+## [277] &quot;GRADE 8 IDENTIFICATION: SCHOOL IS FAVORITE PLACE TO BE&quot;                       
+## [278] &quot;GRADE 8 IDENTIFICATION: PEOPLE ARE INTERESTED IN WHAT I SAY&quot;                  
+## [279] &quot;GRADE 8 IDENTIFICATION: SCHOOL IS WASTE OF TIME&quot;                              
+## [280] &quot;GRADE 8 IDENTIFICATION: DROPPING OUT IS A HUGE MISTAKE&quot;                       
+## [281] &quot;GRADE 8 IDENTIFICATION: MY FRIENDS UPSET WHEN I DO SCHOOLWORK&quot;                
+## [282] &quot;GRADE 8 IDENTIFICATION: SCHOOL IS MORE IMPORTANT THAN PEOPLE THINK&quot;           
+## [283] &quot;GRADE 8 IDENTIFICATION: MY FRIENDS THINK SCHOOL IS WASTE OF TIME&quot;             
+## [284] &quot;GRADE 8 IDENTIFICATION: MOST OF MY FRIENDS GO TO SCHOOL&quot;                      
+## [285] &quot;GRADE 8 IDENTIFICATION SUBSCORE: BELONGING&quot;                                   
+## [286] &quot;GRADE 8 IDENTIFICATION SUBSCORE: VALUING&quot;                                     
+## [287] &quot;GRADE 8 IDENTIFICATION TOTAL SCORE&quot;                                           
+## [288] &quot;GRADE 8 PARTICIPATION, ENGLISH: ABSENTEEISM&quot;                                  
+## [289] &quot;GRADE 8 PARTICIPATION, ENGLISH: SPOKEN TO PARENTS&quot;                            
+## [290] &quot;GRADE 8 PARTICIPATION, ENGLISH: PAYS ATTENTION IN CLASS&quot;                      
+## [291] &quot;GRADE 8 PARTICIPATION, ENGLISH: LOSES MATERIALS&quot;                              
+## [292] &quot;GRADE 8 PARTICIPATION, ENGLISH: COMPLETES ASSIGNMENTS&quot;                        
+## [293] &quot;GRADE 8 PARTICIPATION, ENGLISH: COMES LATE TO CLASS&quot;                          
+## [294] &quot;GRADE 8 PARTICIPATION, ENGLISH: IS PERSISTENT&quot;                                
+## [295] &quot;GRADE 8 PARTICIPATION, ENGLISH: CRITICIZES SUBJECT MATTER&quot;                    
+## [296] &quot;GRADE 8 PARTICIPATION, ENGLISH: DOES MORE THAN ASSIGNED WORK&quot;                 
+## [297] &quot;GRADE 8 PARTICIPATION, ENGLISH: ANNOYS OTHERS&quot;                                
+## [298] &quot;GRADE 8 PARTICIPATION, ENGLISH: THINKS COURSE IS VALUABLE&quot;                    
+## [299] &quot;GRADE 8 PARTICIPATION, ENGLISH: IS CRITICAL OF ACHIEVERS&quot;                     
+## [300] &quot;GRADE 8 PARTICIPATION, ENGLISH: PARTICIPATES IN DISCUSSIONS&quot;                  
+## [301] &quot;GRADE 8 PARTICIPATION, ENGLISH: NEEDS REPRIMANDING&quot;                           
+## [302] &quot;GRADE 8 PARTICIPATION, ENGLISH: ABUSIVE TO TEACHER&quot;                           
+## [303] &quot;GRADE 8 PARTICIPATION, ENGLISH: DISCUSSES SUBJECT MATTER OUTSIDE OF CLASS&quot;    
+## [304] &quot;GRADE 8 PARTICIPATION, ENGLISH: EFFORT SCORE&quot;                                 
+## [305] &quot;GRADE 8 PARTICIPATION, ENGLISH: INITIATIVE SCORE&quot;                             
+## [306] &quot;GRADE 8 PARTIICPATION, ENGLISH: NON-PARTICIPATION SCORE&quot;                      
+## [307] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: ABSENTEEISM&quot;                              
+## [308] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: SPOKEN TO PARENTS&quot;                        
+## [309] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: PAYS ATTENTION IN CLASS&quot;                  
+## [310] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: LOSES MATERIALS&quot;                          
+## [311] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: COMPLETES ASSIGNMENTS&quot;                    
+## [312] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: COMES LATE TO CLASS&quot;                      
+## [313] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: IS PERSISTENT&quot;                            
+## [314] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: CRITICIZES SUBJECT MATTER&quot;                
+## [315] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: DOES MORE THAN ASSIGNED WORK&quot;             
+## [316] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: ANNOYS OTHERS&quot;                            
+## [317] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: THINKS COURSE IS VALUABLE&quot;                
+## [318] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: IS CRITICAL OF ACHIEVERS&quot;                 
+## [319] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: PARTICIPATES IN DISCUSSIONS&quot;              
+## [320] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: NEEDS REPRIMANDING&quot;                       
+## [321] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: ABUSIVE TO TEACHER&quot;                       
+## [322] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: DISCUSSES SUBJECT MATTER OUTSIDE OF CLASS&quot;
+## [323] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: EFFORT SCORE&quot;                             
+## [324] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: INITIATIVE SCORE&quot;                         
+## [325] &quot;GRADE 8 PARTICIPATION, MATHEMATICS: NON-PARTICIPATION SCORE&quot;                  
+## [326] &quot;HIGH SCHOOL ID&quot;                                                               
+## [327] &quot;NUMBER OF SEMESTERS FRENCH 1 HIGH SCHOOL&quot;                                     
+## [328] &quot;NUMBER OF SEMESTERS FRENCH 2 HIGH SCHOOL&quot;                                     
+## [329] &quot;NUMBER OF SEMESTERS FRENCH 3 HIGH SCHOOL&quot;                                     
+## [330] &quot;NUMBER OF SEMESTERS FRENCH 4 HIGH SCHOOL&quot;                                     
+## [331] &quot;NUMBER OF SEMESTERS GERMAN 1 HIGH SCHOOL&quot;                                     
+## [332] &quot;NUMBER OF SEMESTERS GERMAN 2 HIGH SCHOOL&quot;                                     
+## [333] &quot;NUMBER OF SEMESTERS GERMAN 3 HIGH SCHOOL&quot;                                     
+## [334] &quot;NUMBER OF SEMESTERS GERMAN 4 HIGH SCHOOL&quot;                                     
+## [335] &quot;NUMBER OF SEMESTERS LATIN 1 HIGH SCHOOL&quot;                                      
+## [336] &quot;NUMBER OF SEMESTERS LATIN 2 HIGH SCHOOL&quot;                                      
+## [337] &quot;NUMBER OF SEMESTERS LATIN 3 HIGH SCHOOL&quot;                                      
+## [338] &quot;NUMBER OF SEMESTERS LATIN 4 HIGH SCHOOL&quot;                                      
+## [339] &quot;NUMBER OF SEMESTERS SPANISH 1 HIGH SCHOOL&quot;                                    
+## [340] &quot;NUMBER OF SEMESTERS SPANISH 2 HIGH SCHOOL&quot;                                    
+## [341] &quot;NUMBER OF SEMESTERS SPANISH 3 HIGH SCHOOL&quot;                                    
+## [342] &quot;NUMBER OF SEMESTERS SPANISH 4 HIGH SCHOOL&quot;                                    
+## [343] &quot;NUMBER OF SEMESTERS SPANISH 5 HIGH SCHOOL&quot;                                    
+## [344] &quot;NUMBER OF SEMESTERS FOREIGN LANGUAGE 1 HIGH SCHOOL&quot;                           
+## [345] &quot;NUMBER OF SEMESTERS FOREIGN LANGUAGE 2 HIGH SCHOOL&quot;                           
+## [346] &quot;NUMBER OF SEMESTERS FOREIGN LANGUAGE 3 HIGH SCHOOL&quot;                           
+## [347] &quot;NUMBER OF SEMESTERS FOREIGN LANGUAGE 4 HIGH SCHOOL&quot;                           
+## [348] &quot;TOTAL NUMBER OF SEMESTERS FOREIGN LANGUAGE HIGH SCHOOL&quot;                       
+## [349] &quot;NUMBER OF SEMESTERS MATH 1 HIGH SCHOOL&quot;                                       
+## [350] &quot;NUMBER OF SEMESTERS MATH 2 HIGH SCHOOL&quot;                                       
+## [351] &quot;NUMBER OF SEMESTERS MATH 3 HIGH SCHOOL&quot;                                       
+## [352] &quot;NUMBER OF SEMESTERS MATH 4 HIGH SCHOOL&quot;                                       
+## [353] &quot;NUMBER OF SEMESTERS MATH 5 HIGH SCHOOL&quot;                                       
+## [354] &quot;TOTAL NUMBER OF SEMESTERS MATH HIGH SCHOOL&quot;                                   
+## [355] &quot;TOTAL NUMBER OF SEMESTERS SCIENCE HIGH SCHOOL&quot;                                
+## [356] &quot;GPA FOREIGN LANGUAGE HIGH SCHOOL&quot;                                             
+## [357] &quot;GPA MATH HIGH SCHOOL&quot;                                                         
+## [358] &quot;GPA SCIENCE HIGH SCHOOL&quot;                                                      
+## [359] &quot;GPA OVERALL HIGH SCHOOL&quot;                                                      
+## [360] &quot;HIGHEST FOREIGN LANGUAGE LEVEL HIGH SCHOOL&quot;                                   
+## [361] &quot;HIGHEST MATH LEVEL HIGH SCHOOL&quot;                                               
+## [362] &quot;NUMBER OF YEARS OF HIGH SCHOOL COURSE TAKING DATA&quot;                            
+## [363] &quot;SOURCE OF HIGH SCHOOL COURSE TAKING DATA&quot;                                     
+## [364] &quot;TOOK SAT TEST HIGH SCHOOL&quot;                                                    
+## [365] &quot;TOOK ACT TEST HIGH SCHOOL&quot;                                                    
+## [366] &quot;TOOK EITHER SAT OR ACT TEST HIGH SCHOOL&quot;                                      
+## [367] &quot;SAT MATH SCORE HIGH SCHOOL&quot;                                                   
+## [368] &quot;SAT VERBAL SCORE HIGH SCHOOL&quot;                                                 
+## [369] &quot;SAT COMBINED VERBAL + MATH SCORE HIGH SCHOOL&quot;                                 
+## [370] &quot;ACT COMPOSITE SCORE HIGH SCHOOL&quot;                                              
+## [371] &quot;ACT TOTAL OF PARTS (ENG, READ, MATH, SCI) SCORES HIGH SCHOOL&quot;                 
+## [372] &quot;ACT ENGLISH SCORE HIGH SCHOOL&quot;                                                
+## [373] &quot;ACT MATH SCORE HIGH SCHOOL&quot;                                                   
+## [374] &quot;ACT READING SCORE HIGH SCHOOL&quot;                                                
+## [375] &quot;ACT SCIENCE SCORE HIGH SCHOOL&quot;                                                
+## [376] &quot;ACT --&gt; SAT (TEST SCORE REPORTED IN SAT SUM METRIC) HIGH SCHOOL&quot;              
+## [377] &quot;SAT --&gt; ACT (TEST SCORE REPORTED IN ACT COMPOSITE METRIC) HIGH SCHOOL&quot;        
+## [378] &quot;HIGH SCHOOL GRADUATION STATUS (WITH ADDITIONAL CODES)&quot;                        
+## [379] &quot;HIGH SCHOOL GRADUATION STATUS (COLLAPSING ADDITIONAL CODES)&quot;</code></pre>
+</div>
+<div id="core-variables-demographics" class="section level2">
+<h2>Core Variables: Demographics</h2>
+<div id="id" class="section level3">
+<h3>ID</h3>
+<pre class="r"><code>x %&gt;% summarize(min = min(stdntid, na.rm = TRUE),max = max(stdntid, na.rm = TRUE), num_NA = sum(is.na(stdntid)) )   </code></pre>
+<pre><code>##     min   max num_NA
+## 1 10000 21600      1</code></pre>
+<p>No missings.</p>
+</div>
+<div id="gender" class="section level3">
+<h3>Gender</h3>
+<pre class="r"><code>summary(x$gender)</code></pre>
+<pre><code>##   MALE FEMALE   NA's 
+##   6124   5457     21</code></pre>
+<pre class="r"><code>attributes(x$gender)</code></pre>
+<pre><code>## $levels
+## [1] &quot;MALE&quot;   &quot;FEMALE&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;STUDENT GENDER&quot;</code></pre>
+</div>
+<div id="race" class="section level3">
+<h3>race</h3>
+<pre class="r"><code>summary(x$race)</code></pre>
+<pre><code>##           WHITE           BLACK           ASIAN        HISPANIC NATIVE AMERICAN 
+##            7200            4180              32              21              14 
+##           OTHER            NA's 
+##              20             135</code></pre>
+<pre class="r"><code>attributes(x$race)</code></pre>
+<pre><code>## $levels
+## [1] &quot;WHITE&quot;           &quot;BLACK&quot;           &quot;ASIAN&quot;           &quot;HISPANIC&quot;       
+## [5] &quot;NATIVE AMERICAN&quot; &quot;OTHER&quot;          
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;STUDENT RACE/ETHNICITY&quot;</code></pre>
+</div>
+<div id="free-lunch" class="section level3">
+<h3>free lunch</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gkfreelunch)</code></pre>
+<pre><code>##     FREE LUNCH NON-FREE LUNCH           NA's 
+##           3052           3248           5302</code></pre>
+<pre class="r"><code>attributes(x$gkfreelunch)</code></pre>
+<pre><code>## $levels
+## [1] &quot;FREE LUNCH&quot;     &quot;NON-FREE LUNCH&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;FREE/REDUCED LUNCH STATUS KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$g1freelunch)</code></pre>
+<pre><code>##     FREE LUNCH NON-FREE LUNCH           NA's 
+##           3429           3221           4952</code></pre>
+<pre class="r"><code>attributes(x$g1freelunch)</code></pre>
+<pre><code>## $levels
+## [1] &quot;FREE LUNCH&quot;     &quot;NON-FREE LUNCH&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;FREE/REDUCED LUNCH STATUS GRADE 1&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$g2freelunch)</code></pre>
+<pre><code>##     FREE LUNCH NON-FREE LUNCH           NA's 
+##           3336           3160           5106</code></pre>
+<pre class="r"><code>attributes(x$g2freelunch)</code></pre>
+<pre><code>## $levels
+## [1] &quot;FREE LUNCH&quot;     &quot;NON-FREE LUNCH&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;FREE/REDUCED LUNCH STATUS GRADE 2&quot;</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$g3freelunch)</code></pre>
+<pre><code>##     FREE LUNCH NON-FREE LUNCH           NA's 
+##           3293           3227           5082</code></pre>
+<pre class="r"><code>attributes(x$g3freelunch)</code></pre>
+<pre><code>## $levels
+## [1] &quot;FREE LUNCH&quot;     &quot;NON-FREE LUNCH&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;FREE/REDUCED LUNCH STATUS GRADE 3&quot;</code></pre>
+</div>
+</div>
+<div id="performence" class="section level2">
+<h2>Performence</h2>
+<div id="repetition-of-class" class="section level3">
+<h3>Repetition of class</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gkrepeat)</code></pre>
+<pre><code>##    YES, PROMOTION RECOMMENDED NO, PROMOTION NOT RECOMMENDED 
+##                          6044                           253 
+##                          NA's 
+##                          5305</code></pre>
+<pre class="r"><code>attributes(x$gkrepeat)</code></pre>
+<pre><code>## $levels
+## [1] &quot;YES, PROMOTION RECOMMENDED&quot;    &quot;NO, PROMOTION NOT RECOMMENDED&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;REPEATING KINDERGARTEN IN 1985-1986 SCHOOL YEAR&quot;</code></pre>
+</div>
+<div id="special-education" class="section level3">
+<h3>Special Education</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gkspeced)</code></pre>
+<pre><code>##  YES   NO NA's 
+##  202 6122 5278</code></pre>
+<pre class="r"><code>attributes(x$gkspeced)</code></pre>
+<pre><code>## $levels
+## [1] &quot;YES&quot; &quot;NO&quot; 
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;SPECIAL EDUCATION STATUS KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$g1speced)</code></pre>
+<pre><code>##  YES   NO NA's 
+##   84 6742 4776</code></pre>
+<pre class="r"><code>attributes(x$g1speced)</code></pre>
+<pre><code>## $levels
+## [1] &quot;YES&quot; &quot;NO&quot; 
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;SPECIAL EDUCATION STATUS GRADE 1&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$g2speced)</code></pre>
+<pre><code>## Length  Class   Mode 
+##      0   NULL   NULL</code></pre>
+<pre class="r"><code>attributes(x$g2speced)</code></pre>
+<pre><code>## NULL</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$g3speced)</code></pre>
+<pre><code>## Length  Class   Mode 
+##      0   NULL   NULL</code></pre>
+<pre class="r"><code>attributes(x$g3speced)</code></pre>
+<pre><code>## NULL</code></pre>
+</div>
+<div id="reading-skills" class="section level3">
+<h3>Reading Skills</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gktreadss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   315.0   414.0   433.0   436.7   453.0   627.0    5813</code></pre>
+<pre class="r"><code>attributes(x$gktreadss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL READING SCALE SCORE SAT KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$g1treadss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   404.0   478.0   514.0   520.8   558.0   651.0    5207</code></pre>
+<pre class="r"><code>attributes(x$g1treadss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL READING SCALE SCORE SAT GRADE 1&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$g2treadss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   468.0   552.0   582.0   583.9   614.0   732.0    5525</code></pre>
+<pre class="r"><code>attributes(x$g2treadss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL READING SCALE SCORE SAT GRADE 2&quot;</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$g3treadss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   499.0   588.0   614.0   615.4   641.0   775.0    5602</code></pre>
+<pre class="r"><code>attributes(x$g3treadss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL READING SCALE SCORE SAT GRADE 3&quot;</code></pre>
+</div>
+<div id="self-evalaluation" class="section level3">
+<h3>Self evalaluation</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gkmotivraw)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    0.00   24.00   26.00   25.65   27.00   36.00    6564</code></pre>
+<pre class="r"><code>attributes(x$gkmotivraw)</code></pre>
+<pre><code>## $comment
+## [1] &quot;MOTIVATION RAW SCORE SCAMIN KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$g1motivraw)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   27.00   48.00   50.00   50.07   52.00   60.00    5750</code></pre>
+<pre class="r"><code>attributes(x$g1motivraw)</code></pre>
+<pre><code>## $comment
+## [1] &quot;MOTIVATION RAW SCORE SCAMIN GRADE 1&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$g2motivraw)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   16.00   48.00   50.00   49.61   52.00   60.00    5484</code></pre>
+<pre class="r"><code>attributes(x$g2motivraw)</code></pre>
+<pre><code>## $comment
+## [1] &quot;MOTIVATION RAW SCORE SCAMIN GRADE 2&quot;</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$g3motivraw)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   17.00   47.00   50.00   49.21   52.00   60.00    5473</code></pre>
+<pre class="r"><code>attributes(x$g3motivraw)</code></pre>
+<pre><code>## $comment
+## [1] &quot;MOTIVATION RAW SCORE SCAMIN GRADE 3&quot;</code></pre>
+</div>
+<div id="math-skills" class="section level3">
+<h3>Math Skills</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gktmathss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   288.0   454.0   484.0   485.4   513.0   626.0    5731</code></pre>
+<pre class="r"><code>attributes(x$gktmathss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL MATH SCALE SCORE SAT KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$g1tmathss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   404.0   500.0   529.0   530.5   557.0   676.0    5004</code></pre>
+<pre class="r"><code>attributes(x$g1tmathss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL MATH SCALE SCORE SAT GRADE 1&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$g2tmathss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   441.0   550.0   579.0   580.6   611.0   721.0    5537</code></pre>
+<pre class="r"><code>attributes(x$g2tmathss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL MATH SCALE SCORE SAT GRADE 2&quot;</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$g3tmathss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##     487     591     616     618     645     774    5525</code></pre>
+<pre class="r"><code>attributes(x$g3tmathss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL MATH SCALE SCORE SAT GRADE 3&quot;</code></pre>
+</div>
+<div id="listening-skills" class="section level3">
+<h3>Listening Skills</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gktlistss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   397.0   516.0   536.0   537.5   560.0   671.0    5765</code></pre>
+<pre class="r"><code>attributes(x$gktlistss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL LISTENING SCALE SCORE SAT KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$g1tlistss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   477.0   543.0   565.0   567.5   588.0   708.0    5046</code></pre>
+<pre class="r"><code>attributes(x$g1tlistss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL LISTENING SCALE SCORE SAT GRADE 1&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$g2tlistss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   510.0   570.0   593.0   595.5   617.0   740.0    5559</code></pre>
+<pre class="r"><code>attributes(x$g2tlistss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL LISTENING SCALE SCORE SAT GRADE 2&quot;</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$g3tlistss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   524.0   601.0   622.0   624.1   646.0   779.0    5528</code></pre>
+<pre class="r"><code>attributes(x$g3tlistss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;TOTAL LISTENING SCALE SCORE SAT GRADE 3&quot;</code></pre>
+</div>
+<div id="word-skills" class="section level3">
+<h3>Word Skills</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gkwordskillss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   315.0   405.0   427.0   434.2   458.0   593.0    5751</code></pre>
+<pre class="r"><code>attributes(x$gkwordskillss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;WORD STUDY SKILLS SCALE SCORE SAT KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$gkwordskillss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   315.0   405.0   427.0   434.2   458.0   593.0    5751</code></pre>
+<pre class="r"><code>attributes(x$gkwordskillss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;WORD STUDY SKILLS SCALE SCORE SAT KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$gkwordskillss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   315.0   405.0   427.0   434.2   458.0   593.0    5751</code></pre>
+<pre class="r"><code>attributes(x$gkwordskillss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;WORD STUDY SKILLS SCALE SCORE SAT KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$gkwordskillss)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   315.0   405.0   427.0   434.2   458.0   593.0    5751</code></pre>
+<pre class="r"><code>attributes(x$gkwordskillss)</code></pre>
+<pre><code>## $comment
+## [1] &quot;WORD STUDY SKILLS SCALE SCORE SAT KINDERGARTEN&quot;</code></pre>
+</div>
+<div id="motivation" class="section level3">
+<h3>Motivation</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gkmotivraw)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    0.00   24.00   26.00   25.65   27.00   36.00    6564</code></pre>
+<pre class="r"><code>attributes(x$gkmotivraw)</code></pre>
+<pre><code>## $comment
+## [1] &quot;MOTIVATION RAW SCORE SCAMIN KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$gkmotivraw)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    0.00   24.00   26.00   25.65   27.00   36.00    6564</code></pre>
+<pre class="r"><code>attributes(x$gkmotivraw)</code></pre>
+<pre><code>## $comment
+## [1] &quot;MOTIVATION RAW SCORE SCAMIN KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$gkmotivraw)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    0.00   24.00   26.00   25.65   27.00   36.00    6564</code></pre>
+<pre class="r"><code>attributes(x$gkmotivraw)</code></pre>
+<pre><code>## $comment
+## [1] &quot;MOTIVATION RAW SCORE SCAMIN KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$gkmotivraw)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    0.00   24.00   26.00   25.65   27.00   36.00    6564</code></pre>
+<pre class="r"><code>attributes(x$gkmotivraw)</code></pre>
+<pre><code>## $comment
+## [1] &quot;MOTIVATION RAW SCORE SCAMIN KINDERGARTEN&quot;</code></pre>
+</div>
+<div id="satact-scores" class="section level3">
+<h3>SAT/ACT Scores</h3>
+<p>SAT</p>
+<pre class="r"><code># Math
+summary(x$hssatmath)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   200.0   440.0   510.0   519.3   600.0   800.0   11113</code></pre>
+<pre class="r"><code>attributes(x$hssatmath)</code></pre>
+<pre><code>## $comment
+## [1] &quot;SAT MATH SCORE HIGH SCHOOL&quot;</code></pre>
+<pre class="r"><code># total
+summary(x$hssattot)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##     400     910    1060    1047    1190    1560   11113</code></pre>
+<pre class="r"><code>attributes(x$hssattot)</code></pre>
+<pre><code>## $comment
+## [1] &quot;SAT COMBINED VERBAL + MATH SCORE HIGH SCHOOL&quot;</code></pre>
+<p>ACT</p>
+<pre class="r"><code># Math
+summary(x$hsactmath)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##     8.0    15.0    17.0    18.3    20.0    36.0    7847</code></pre>
+<pre class="r"><code>attributes(x$hsactmath)</code></pre>
+<pre><code>## $comment
+## [1] &quot;ACT MATH SCORE HIGH SCHOOL&quot;</code></pre>
+<pre class="r"><code># total
+summary(x$hssattot)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##     400     910    1060    1047    1190    1560   11113</code></pre>
+<pre class="r"><code>attributes(x$hssattot)</code></pre>
+<pre><code>## $comment
+## [1] &quot;SAT COMBINED VERBAL + MATH SCORE HIGH SCHOOL&quot;</code></pre>
+</div>
+</div>
+<div id="kindergarten-characteristics" class="section level2">
+<h2>Kindergarten characteristics</h2>
+<div id="absent-time" class="section level3">
+<h3>Absent time</h3>
+<pre class="r"><code>summary(x$gkabsent)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    0.00    4.00    8.00   10.51   14.00   99.00    5351</code></pre>
+<pre class="r"><code>attributes(x$gkabsent)</code></pre>
+<pre><code>## $comment
+## [1] &quot;DAYS ABSENT FROM SCHOOL KINDERGARTEN&quot;</code></pre>
+</div>
+<div id="urbanrural" class="section level3">
+<h3>urban/rural</h3>
+<pre class="r"><code>summary(x$gksurban)</code></pre>
+<pre><code>## INNER CITY   SUBURBAN      RURAL      URBAN       NA's 
+##       1428       1412       2917        568       5277</code></pre>
+<pre class="r"><code>attributes(x$gksurban)</code></pre>
+<pre><code>## $levels
+## [1] &quot;INNER CITY&quot; &quot;SUBURBAN&quot;   &quot;RURAL&quot;      &quot;URBAN&quot;     
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;SCHOOL URBANICITY KINDERGARTEN&quot;</code></pre>
+</div>
+<div id="years-in-kindergarten" class="section level3">
+<h3>years in kindergarten</h3>
+<pre class="r"><code>summary(x$gktyears)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   0.000   5.000   9.000   9.258  13.000  27.000    5298</code></pre>
+<pre class="r"><code>attributes(x$gktyears)</code></pre>
+<pre><code>## $comment
+## [1] &quot;YEARS OF TOTAL TEACHING EXPERIENCE KINDERGARTEN&quot;</code></pre>
+</div>
+</div>
+<div id="school-characteristics" class="section level2">
+<h2>School characteristics</h2>
+<div id="school-id" class="section level3">
+<h3>school ID</h3>
+<pre class="r"><code>summary(x$g1schid)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##  112038  170295  212522  209575  244755  264945    4773</code></pre>
+<pre class="r"><code>attributes(x$g1schid)</code></pre>
+<pre><code>## $comment
+## [1] &quot;GRADE 1 SCHOOL ID&quot;</code></pre>
+</div>
+<div id="urbanrural-1" class="section level3">
+<h3>urban/rural</h3>
+<pre class="r"><code>summary(x$g1schid)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##  112038  170295  212522  209575  244755  264945    4773</code></pre>
+<pre class="r"><code>attributes(x$g1schid)</code></pre>
+<pre><code>## $comment
+## [1] &quot;GRADE 1 SCHOOL ID&quot;</code></pre>
+</div>
+</div>
+<div id="teacher-characteristics" class="section level2">
+<h2>Teacher characteristics</h2>
+<div id="gender-1" class="section level3">
+<h3>Gender</h3>
+<pre class="r"><code>summary(x$g1tgen)</code></pre>
+<pre><code>##   MALE FEMALE   NA's 
+##     29   6781   4792</code></pre>
+<pre class="r"><code>attributes(x$g1tgen)</code></pre>
+<pre><code>## $levels
+## [1] &quot;MALE&quot;   &quot;FEMALE&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;TEACHER GENDER GRADE 1&quot;</code></pre>
+</div>
+<div id="high-school-degree" class="section level3">
+<h3>High School Degree</h3>
+<pre class="r"><code>summary(x$g1thighdegree)</code></pre>
+<pre><code>## ASSOCIATES  BACHELORS    MASTERS   MASTER + SPECIALIST   DOCTORAL       NA's 
+##          0       4456       2294          0         38         22       4792</code></pre>
+<pre class="r"><code>attributes(x$g1thighdegree)</code></pre>
+<pre><code>## $levels
+## [1] &quot;ASSOCIATES&quot; &quot;BACHELORS&quot;  &quot;MASTERS&quot;    &quot;MASTER +&quot;   &quot;SPECIALIST&quot;
+## [6] &quot;DOCTORAL&quot;  
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;TEACHER HIGHEST DEGREE GRADE 1&quot;</code></pre>
+</div>
+<div id="race-1" class="section level3">
+<h3>Race</h3>
+<pre class="r"><code>summary(x$g1trace)</code></pre>
+<pre><code>##           WHITE           BLACK           ASIAN        HISPANIC NATIVE AMERICAN 
+##            5623            1187               0               0               0 
+##           OTHER            NA's 
+##               0            4792</code></pre>
+<pre class="r"><code>attributes(x$g1trace)</code></pre>
+<pre><code>## $levels
+## [1] &quot;WHITE&quot;           &quot;BLACK&quot;           &quot;ASIAN&quot;           &quot;HISPANIC&quot;       
+## [5] &quot;NATIVE AMERICAN&quot; &quot;OTHER&quot;          
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;TEACHER RACE/ETHNICITY GRADE 1&quot;</code></pre>
+</div>
+<div id="career-level" class="section level3">
+<h3>Career Level</h3>
+<pre class="r"><code>summary(x$g1tcareer)</code></pre>
+<pre><code>## CHOSE NOT TO BE ON CAREER LADDER                       APPRENTICE 
+##                              506                              718 
+##                        PROBATION                   LADDER LEVEL 1 
+##                              666                             4492 
+##                   LADDER LEVEL 2                   LADDER LEVEL 3 
+##                              114                              291 
+##                          PENDING                             NA's 
+##                                0                             4815</code></pre>
+<pre class="r"><code>attributes(x$g1tcareer)</code></pre>
+<pre><code>## $levels
+## [1] &quot;CHOSE NOT TO BE ON CAREER LADDER&quot; &quot;APPRENTICE&quot;                      
+## [3] &quot;PROBATION&quot;                        &quot;LADDER LEVEL 1&quot;                  
+## [5] &quot;LADDER LEVEL 2&quot;                   &quot;LADDER LEVEL 3&quot;                  
+## [7] &quot;PENDING&quot;                         
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;TEACHER CAREER LADDER LEVEL GRADE 1&quot;</code></pre>
+</div>
+<div id="experience-level" class="section level3">
+<h3>Experience Level</h3>
+<pre class="r"><code>summary(x$g1tyears)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    0.00    4.00   10.00   11.63   17.00   42.00    4792</code></pre>
+<pre class="r"><code>attributes(x$g1tyears)</code></pre>
+<pre><code>## $comment
+## [1] &quot;YEARS OF TOTAL TEACHING EXPERIENCE GRADE 1&quot;</code></pre>
+</div>
+</div>
+<div id="core-variables-design" class="section level2">
+<h2>Core Variables: Design</h2>
+<div id="level-of-entryparticipation" class="section level3">
+<h3>Level of Entry/Participation</h3>
+<pre class="r"><code># Kindergarten
+summary(x$X)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 5276 6325    1</code></pre>
+<pre class="r"><code>attributes(x$X)</code></pre>
+<pre><code>## $levels
+## [1] &quot;NO&quot;  &quot;YES&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;IN STAR IN KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$X.1)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 4772 6829    1</code></pre>
+<pre class="r"><code>attributes(x$X.1)</code></pre>
+<pre><code>## $levels
+## [1] &quot;NO&quot;  &quot;YES&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;IN STAR IN GRADE 1&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$X.2)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 4761 6840    1</code></pre>
+<pre class="r"><code>attributes(x$X.2)</code></pre>
+<pre><code>## $levels
+## [1] &quot;NO&quot;  &quot;YES&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;IN STAR IN GRADE 2&quot;</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$X.3)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 4799 6802    1</code></pre>
+<pre class="r"><code>attributes(x$X.3)</code></pre>
+<pre><code>## $levels
+## [1] &quot;NO&quot;  &quot;YES&quot;
+## 
+## $class
+## [1] &quot;factor&quot;
+## 
+## $comment
+## [1] &quot;IN STAR IN GRADE 3&quot;</code></pre>
+</div>
+<div id="flags-for-achievement-data" class="section level3">
+<h3>Flags for achievement Data</h3>
+<pre class="r"><code># Kindergarten
+summary(x$flaggk)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 5694 5907    1</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$flagg1)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 4917 6684    1</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$flagg2)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 5042 6559    1</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$flagg3)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 5137 6464    1</code></pre>
+<pre class="r"><code># Grade 4
+summary(x$flagg4)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 5262 6339    1</code></pre>
+<pre class="r"><code># Grade 5
+summary(x$flagg5)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 9008 2593    1</code></pre>
+<pre class="r"><code># Grade 6
+summary(x$flagg6)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 5160 6441    1</code></pre>
+<pre class="r"><code># Grade 7
+summary(x$flagg7)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 6659 4942    1</code></pre>
+<pre class="r"><code># Grade 8
+summary(x$flagg8)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 5240 6361    1</code></pre>
+</div>
+<div id="flags-for-further-participation-studies" class="section level3">
+<h3>Flags for further participation Studies</h3>
+<pre class="r"><code># Grade 4
+summary(x$flagprt4)    </code></pre>
+<pre><code>##   NO  YES NA's 
+## 9384 2217    1</code></pre>
+<pre class="r"><code># Grade 8: self identification
+summary(x$flagidn8)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 7953 3648    1</code></pre>
+<pre class="r"><code># Grade 8: participation
+summary(x$flagprt8)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 8623 2978    1</code></pre>
+<pre class="r"><code># University entry: SAT/ACT
+summary(x$flagsatact)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 7721 3880    1</code></pre>
+<pre class="r"><code># Highschool Data 
+summary(x$flaghscourse)</code></pre>
+<pre><code>##      NO     YES MISSING    NA's 
+##    7679    3922       0       1</code></pre>
+<pre class="r"><code># Highschool Data Graduation
+summary(x$flaghsgraduate)</code></pre>
+<pre><code>##   NO  YES NA's 
+## 6609 4992    1</code></pre>
+</div>
+<div id="class-room-type-core-treatment" class="section level3">
+<h3>Class Room Type (<strong>core Treatment</strong>)</h3>
+<pre class="r"><code># Kindergarten
+summary(x$gkclasstype)</code></pre>
+<pre><code>##          SMALL CLASS        REGULAR CLASS REGULAR + AIDE CLASS 
+##                 1900                 2194                 2231 
+##                 NA's 
+##                 5277</code></pre>
+<pre class="r"><code>attributes(x$gkclasstype)</code></pre>
+<pre><code>## $levels
+## [1] &quot;SMALL CLASS&quot;          &quot;REGULAR CLASS&quot;        &quot;REGULAR + AIDE CLASS&quot;
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;CLASSROOM TYPE KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code>summary(x$gkclasssize)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   12.00   17.00   22.00   20.34   23.00   28.00    5277</code></pre>
+<pre class="r"><code>attributes(x$gkclasssize)</code></pre>
+<pre><code>## $comment
+## [1] &quot;CLASS SIZE KINDERGARTEN&quot;</code></pre>
+<pre class="r"><code># Grade 1
+summary(x$g1classtype)</code></pre>
+<pre><code>##          SMALL CLASS        REGULAR CLASS REGULAR + AIDE CLASS 
+##                 1925                 2584                 2320 
+##                 NA's 
+##                 4773</code></pre>
+<pre class="r"><code>attributes(x$g1classtype)</code></pre>
+<pre><code>## $levels
+## [1] &quot;SMALL CLASS&quot;          &quot;REGULAR CLASS&quot;        &quot;REGULAR + AIDE CLASS&quot;
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;CLASSROOM TYPE GRADE 1&quot;</code></pre>
+<pre class="r"><code>summary(x$g1classsize)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   12.00   17.00   22.00   20.98   24.00   30.00    4773</code></pre>
+<pre class="r"><code>attributes(x$g1classsize)</code></pre>
+<pre><code>## $comment
+## [1] &quot;CLASS SIZE GRADE 1&quot;</code></pre>
+<pre class="r"><code># Grade 2
+summary(x$g2classtype)</code></pre>
+<pre><code>##          SMALL CLASS        REGULAR CLASS REGULAR + AIDE CLASS 
+##                 2016                 2329                 2495 
+##                 NA's 
+##                 4762</code></pre>
+<pre class="r"><code>attributes(x$g2classtype)</code></pre>
+<pre><code>## $levels
+## [1] &quot;SMALL CLASS&quot;          &quot;REGULAR CLASS&quot;        &quot;REGULAR + AIDE CLASS&quot;
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;CLASSROOM TYPE GRADE 2&quot;</code></pre>
+<pre class="r"><code>summary(x$g2classsize)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   12.00   17.00   22.00   21.06   24.00   29.00    4762</code></pre>
+<pre class="r"><code>attributes(x$g2classsize)</code></pre>
+<pre><code>## $comment
+## [1] &quot;CLASS SIZE GRADE 2&quot;</code></pre>
+<pre class="r"><code># Grade 3
+summary(x$g3classtype)</code></pre>
+<pre><code>##          SMALL CLASS        REGULAR CLASS REGULAR + AIDE CLASS 
+##                 2174                 2085                 2543 
+##                 NA's 
+##                 4800</code></pre>
+<pre class="r"><code>attributes(x$g3classtype)</code></pre>
+<pre><code>## $levels
+## [1] &quot;SMALL CLASS&quot;          &quot;REGULAR CLASS&quot;        &quot;REGULAR + AIDE CLASS&quot;
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;CLASSROOM TYPE GRADE 3&quot;</code></pre>
+<pre class="r"><code>summary(x$g3classsize)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   11.00   17.00   22.00   21.25   25.00   29.00    4801</code></pre>
+<pre class="r"><code>attributes(x$g3classsize)</code></pre>
+<pre><code>## $comment
+## [1] &quot;CLASS SIZE GRADE 3&quot;</code></pre>
+</div>
+<div id="flags-for-composition-mobility-of-students" class="section level3">
+<h3>Flags for Composition (mobility of students)</h3>
+<pre class="r"><code>summary(x$cmpstype)</code></pre>
+<pre><code>##   SMALL REGULAR    AIDE    NA's 
+##    3202    3045    4741     614</code></pre>
+<pre class="r"><code>attributes(x$cmpstype)</code></pre>
+<pre><code>## $levels
+## [1] &quot;SMALL&quot;   &quot;REGULAR&quot; &quot;AIDE&quot;   
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;CLASS TYPE COMPOSITE&quot;</code></pre>
+<pre class="r"><code>summary(x$cmpsdura)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   1.000   1.000   1.000   1.952   3.000   4.000     614</code></pre>
+<pre class="r"><code>attributes(x$cmpsdura)</code></pre>
+<pre><code>## $comment
+## [1] &quot;DURATION COMPOSITE&quot;</code></pre>
+<pre class="r"><code>summary(x$yearsstar)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    1.00    1.00    2.00    2.31    4.00    4.00       1</code></pre>
+<pre class="r"><code>attributes(x$yearsstar)</code></pre>
+<pre><code>## $comment
+## [1] &quot;NUMBER OF YEARS IN STAR&quot;</code></pre>
+<pre class="r"><code>summary(x$yearssmall)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##  0.0000  0.0000  0.0000  0.6909  1.0000  4.0000       1</code></pre>
+<pre class="r"><code>attributes(x$yearssmall)</code></pre>
+<pre><code>## $comment
+## [1] &quot;NUMBER OF YEARS IN SMALL CLASSES&quot;</code></pre>
+</div>
+</div>
+<div id="probably-not-relevant" class="section level2">
+<h2>Probably not relevant</h2>
+<div id="birthmonth-birthday" class="section level3">
+<h3>birthmonth, birthday</h3>
+<pre class="r"><code>summary(x$birthmonth)</code></pre>
+<pre><code>##   JANUARY  FEBRUARY     MARCH     ARPIL       MAY      JUNE      JULY    AUGUST 
+##       961       927       947       938       976       936      1137      1134 
+## SEPTEMBER   OCTOBER  NOVEMBER  DECEMBER      NA's 
+##      1154       562       923       938        69</code></pre>
+<pre class="r"><code>attributes(x$birthmonth)</code></pre>
+<pre><code>## $levels
+##  [1] &quot;JANUARY&quot;   &quot;FEBRUARY&quot;  &quot;MARCH&quot;     &quot;ARPIL&quot;     &quot;MAY&quot;       &quot;JUNE&quot;     
+##  [7] &quot;JULY&quot;      &quot;AUGUST&quot;    &quot;SEPTEMBER&quot; &quot;OCTOBER&quot;   &quot;NOVEMBER&quot;  &quot;DECEMBER&quot; 
+## 
+## $class
+## [1] &quot;ordered&quot; &quot;factor&quot; 
+## 
+## $comment
+## [1] &quot;STUDENT MONTH OF BIRTH&quot;</code></pre>
+<pre class="r"><code>summary(x$birthday)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    1.00    8.00   15.00   15.52   23.00   31.00      69</code></pre>
+<pre class="r"><code>attributes(x$birthday)</code></pre>
+<pre><code>## $comment
+## [1] &quot;STUDENT DAY OF BIRTH&quot;</code></pre>
 </div>
 </div>
 </div>
@@ -432,6 +1734,11 @@ $(document).ready(function () {
 </script>
 
 <!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
 
 
 <!-- dynamically load mathjax for compatibility with self-contained -->

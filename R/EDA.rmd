@@ -2,11 +2,18 @@
 title: "EDA"
 author: "Johannes Wagner"
 date: "9/12/2020"
-output: html_document
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, include=FALSE}
+library(tidyverse)
 ```
 
 # Overview Dataset STAR
@@ -14,7 +21,8 @@ knitr::opts_chunk$set(echo = TRUE)
 We load the data from [harvard.com](https://dataverse.harvard.edu/dataset.xhtml?persistentId=hdl:1902.1/10766)
 
 ```{r echo=FALSE, include=FALSE}
-load("/home/hanes/Documents/Projects/2020_Master_STAR/Data/STAR_Students.RData")
+load("/home/hanes/Documents/Projects/2020_Master_STAR/master20/data/STAR_Students.RData")
+
 ```
 
 - 11.602 Students by ID
@@ -36,3 +44,381 @@ load("/home/hanes/Documents/Projects/2020_Master_STAR/Data/STAR_Students.RData")
 - Course taking in mathematics, science, and foreign language in high school, obtained from student transcripts
 - SAT/ACT participation and scores, obtained from ACT, Inc. and from Educational Testing Service
 - Graduation/dropout information, obtained from high school transcripts and the Tennessee State Department of Education
+
+
+
+## First check
+
+Variables by name and values
+
+All variables:
+```{r echo=TRUE}
+list <- attributes(x)
+list$orig.names
+
+```
+
+
+## Core Variables: Demographics
+### ID
+```{r echo=TRUE}
+x %>% summarize(min = min(stdntid, na.rm = TRUE),max = max(stdntid, na.rm = TRUE), num_NA = sum(is.na(stdntid)) )   
+```
+No missings.
+
+### Gender
+```{r echo=TRUE}
+summary(x$gender)
+attributes(x$gender)
+```
+
+### race
+
+```{r echo=TRUE}
+summary(x$race)
+attributes(x$race)
+```
+
+### free lunch
+
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gkfreelunch)
+attributes(x$gkfreelunch)
+# Grade 1
+summary(x$g1freelunch)
+attributes(x$g1freelunch)
+# Grade 2
+summary(x$g2freelunch)
+attributes(x$g2freelunch)
+# Grade 3
+summary(x$g3freelunch)
+attributes(x$g3freelunch)
+```
+
+## Performance
+
+### Repetition of class
+
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gkrepeat)
+attributes(x$gkrepeat)
+```
+
+### Special Education
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gkspeced)
+attributes(x$gkspeced)
+# Grade 1
+summary(x$g1speced)
+attributes(x$g1speced)
+# Grade 2
+summary(x$g2speced)
+attributes(x$g2speced)
+# Grade 3
+summary(x$g3speced)
+attributes(x$g3speced)
+```
+
+### Reading Skills
+
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gktreadss)
+attributes(x$gktreadss)
+# Grade 1
+summary(x$g1treadss)
+attributes(x$g1treadss)
+# Grade 2
+summary(x$g2treadss)
+attributes(x$g2treadss)
+# Grade 3
+summary(x$g3treadss)
+attributes(x$g3treadss)
+
+```
+
+### Self evalaluation
+
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gkmotivraw)
+attributes(x$gkmotivraw)
+# Grade 1
+summary(x$g1motivraw)
+attributes(x$g1motivraw)
+# Grade 2
+summary(x$g2motivraw)
+attributes(x$g2motivraw)
+# Grade 3
+summary(x$g3motivraw)
+attributes(x$g3motivraw)
+```
+
+### Math Skills
+
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gktmathss)
+attributes(x$gktmathss)
+# Grade 1
+summary(x$g1tmathss)
+attributes(x$g1tmathss)
+# Grade 2
+summary(x$g2tmathss)
+attributes(x$g2tmathss)
+# Grade 3
+summary(x$g3tmathss)
+attributes(x$g3tmathss)
+
+```
+
+### Listening Skills
+
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gktlistss)
+attributes(x$gktlistss)
+# Grade 1
+summary(x$g1tlistss)
+attributes(x$g1tlistss)
+# Grade 2
+summary(x$g2tlistss)
+attributes(x$g2tlistss)
+# Grade 3
+summary(x$g3tlistss)
+attributes(x$g3tlistss)
+
+```
+
+### Word Skills
+
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gkwordskillss)
+attributes(x$gkwordskillss)
+# Grade 1
+summary(x$gkwordskillss)
+attributes(x$gkwordskillss)
+# Grade 2
+summary(x$gkwordskillss)
+attributes(x$gkwordskillss)
+# Grade 3
+summary(x$gkwordskillss)
+attributes(x$gkwordskillss)
+```
+
+### Motivation
+
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gkmotivraw)
+attributes(x$gkmotivraw)
+# Grade 1
+summary(x$gkmotivraw)
+attributes(x$gkmotivraw)
+# Grade 2
+summary(x$gkmotivraw)
+attributes(x$gkmotivraw)
+# Grade 3
+summary(x$gkmotivraw)
+attributes(x$gkmotivraw)
+```
+
+### SAT/ACT Scores
+
+SAT 
+```{r echo=TRUE}
+# Math
+summary(x$hssatmath)
+attributes(x$hssatmath)
+# total
+summary(x$hssattot)
+attributes(x$hssattot)
+```
+
+ACT 
+```{r echo=TRUE}
+# Math
+summary(x$hsactmath)
+attributes(x$hsactmath)
+# total
+summary(x$hssattot)
+attributes(x$hssattot)
+```
+
+
+## Kindergarten characteristics 
+
+### Absent time
+```{r echo=TRUE}
+summary(x$gkabsent)
+attributes(x$gkabsent)
+```
+
+### urban/rural
+```{r echo=TRUE}
+summary(x$gksurban)
+attributes(x$gksurban)
+```
+
+### years in kindergarten
+```{r echo=TRUE}
+summary(x$gktyears)
+attributes(x$gktyears)
+```
+
+## School characteristics
+
+### school ID
+```{r echo=TRUE}
+summary(x$g1schid)
+attributes(x$g1schid)
+```
+
+### urban/rural
+```{r echo=TRUE}
+summary(x$g1schid)
+attributes(x$g1schid)
+```
+
+## Teacher characteristics
+
+### Gender
+```{r echo=TRUE}
+summary(x$g1tgen)
+attributes(x$g1tgen)
+```
+
+### High School Degree
+```{r echo=TRUE}
+summary(x$g1thighdegree)
+attributes(x$g1thighdegree)
+```
+
+### Race
+```{r echo=TRUE}
+summary(x$g1trace)
+attributes(x$g1trace)
+```
+
+### Career Level
+```{r echo=TRUE}
+summary(x$g1tcareer)
+attributes(x$g1tcareer)
+```
+
+### Experience Level
+```{r echo=TRUE}
+summary(x$g1tyears)
+attributes(x$g1tyears)
+```
+
+
+
+
+
+## Core Variables: Design 
+
+### Level of Entry/Participation
+```{r echo=TRUE}
+# Kindergarten
+summary(x$X)
+attributes(x$X)
+# Grade 1
+summary(x$X.1)
+attributes(x$X.1)
+# Grade 2
+summary(x$X.2)
+attributes(x$X.2)
+# Grade 3
+summary(x$X.3)
+attributes(x$X.3)
+```
+
+### Flags for achievement Data 
+```{r echo=TRUE}
+# Kindergarten
+summary(x$flaggk)
+# Grade 1
+summary(x$flagg1)
+# Grade 2
+summary(x$flagg2)
+# Grade 3
+summary(x$flagg3)
+# Grade 4
+summary(x$flagg4)
+# Grade 5
+summary(x$flagg5)
+# Grade 6
+summary(x$flagg6)
+# Grade 7
+summary(x$flagg7)
+# Grade 8
+summary(x$flagg8)
+```
+### Flags for further participation Studies
+```{r echo=TRUE}
+# Grade 4
+summary(x$flagprt4)    
+# Grade 8: self identification
+summary(x$flagidn8)
+# Grade 8: participation
+summary(x$flagprt8)
+# University entry: SAT/ACT
+summary(x$flagsatact)
+# Highschool Data 
+summary(x$flaghscourse)
+# Highschool Data Graduation
+summary(x$flaghsgraduate)
+```
+### Class Room Type (**core Treatment**)
+
+```{r echo=TRUE}
+# Kindergarten
+summary(x$gkclasstype)
+attributes(x$gkclasstype)
+summary(x$gkclasssize)
+attributes(x$gkclasssize)
+# Grade 1
+summary(x$g1classtype)
+attributes(x$g1classtype)
+summary(x$g1classsize)
+attributes(x$g1classsize)
+# Grade 2
+summary(x$g2classtype)
+attributes(x$g2classtype)
+summary(x$g2classsize)
+attributes(x$g2classsize)
+# Grade 3
+summary(x$g3classtype)
+attributes(x$g3classtype)
+summary(x$g3classsize)
+attributes(x$g3classsize)
+```
+### Flags for Composition (mobility of students)
+
+```{r echo=TRUE}
+summary(x$cmpstype)
+attributes(x$cmpstype)
+summary(x$cmpsdura)
+attributes(x$cmpsdura)
+summary(x$yearsstar)
+attributes(x$yearsstar)
+summary(x$yearssmall)
+attributes(x$yearssmall)
+```
+
+
+
+## Probably not relevant
+
+### birthmonth, birthday
+```{r echo=TRUE}
+summary(x$birthmonth)
+attributes(x$birthmonth)
+summary(x$birthday)
+attributes(x$birthday)
+```
