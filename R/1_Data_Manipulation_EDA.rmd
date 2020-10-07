@@ -33,6 +33,10 @@ This document is aiming to provide a first insight into the dataset of the STAR 
 load("/home/hanes/Documents/Projects/2020_Master_STAR/master20/data/STAR_Students.RData")
 # rename and drop observation with only NAs
 main_data <- x %>% filter(!is.na(stdntid))
+# Compute Raw average Scores as a new Variable of Interest
+main_data <- 
+  main_data %>% mutate(gkaversc = (gktmathss + gktreadss + gkwordskillss)/3, g1aversc = (g1tmathss + g1treadss + g1wordskillss)/3, g2aversc = (g2tmathss + g2treadss + g2wordskillss)/3, g3aversc = (g3tmathss + g3treadss + g3wordskillss)/3)
+
 # %>% select(c(stdntid, gender, race, X, X.1, X.2,X.3, gktchid)
 main_data_gk <- 
   main_data %>% filter(X=="YES")
@@ -55,25 +59,20 @@ Percentage ranks are first computed for all students in regular classes and then
 
 Mean Scores for students in regular classes in Kindergarten: 
 
-```{r echo=TRUE}
-# Compute Raw average Scores in kindergarten
-main_data <- 
-  main_data %>% mutate(gkaversc = (gktmathss + gktreadss + gkwordskillss)/3, g1aversc = (g1tmathss + g1treadss + g1wordskillss)/3, g2aversc = (g2tmathss + g2treadss + g2wordskillss)/3, g3aversc = (g3tmathss + g3treadss + g3wordskillss)/3)
-```
 
 ```{r echo=TRUE}
 # See Krüger_199, p. 506ff
 reg_scores_gk <- 
   main_data_gk %>% filter(gkclasstype=="REGULAR CLASS" | gkclasstype=="REGULAR + AIDE CLASS", !is.na(gktmathss) & !is.na(gktreadss) & !is.na(gkwordskillss) ) %>%
-    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid)
+    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid, gkaversc)
 
 small_scores_gk <- 
   main_data_gk %>% filter(gkclasstype=="SMALL CLASS", !is.na(gktmathss) & !is.na(gktreadss) & !is.na(gkwordskillss) )  %>%
-    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid  )
+    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid, gkaversc  )
 # calculate raw percentiles and plot them (should be uniform)
 # there are different options available: with percent rank equal scores get the lower percentile (thats why we dont exactually get a uniform distribution of actual percentiles)
 reg_scores_gk <- 
-  reg_scores_gk %>% mutate(perc_maths_gk=percent_rank(gktmathss), perc_read_gk =percent_rank(gktreadss), perc_word_gk=percent_rank(gkwordskillss))
+  reg_scores_gk %>% mutate(perc_maths_gk=percent_rank(gktmathss), perc_read_gk =percent_rank(gktreadss), perc_word_gk=percent_rank(gkwordskillss), perc_av_gk=percent_rank(gkaversc))
 # summary(reg_data_gk$raw_perc_maths); summary(reg_data_gk$raw_perc_maths2)
 # Why is mean not 0.5???
 # hist(summary(reg_data_gk$raw_perc_maths2))
@@ -87,21 +86,16 @@ for (i in 1:nrow(small_scores_gk)) {
   obs <- small_scores_gk[i,]
   # add to regular observations and compute percentile ranks
   temp <- add_row(reg_scores_gk, obs) %>% 
-    mutate(perc_maths_gk=percent_rank(gktmathss), perc_read_gk =percent_rank(gktreadss), perc_word_gk=percent_rank(gkwordskillss))
+    mutate(perc_maths_gk=percent_rank(gktmathss), perc_read_gk =percent_rank(gktreadss), perc_word_gk=percent_rank(gkwordskillss), perc_av_gk=percent_rank(gkaversc))
   # add observation to merged scores
   scores_gk <-  add_row(scores_gk, tail(temp,1))
 }
 
-# calculate average of the scores
-scores_gk <- 
-  scores_gk %>% mutate(perc_average_gk = (perc_maths_gk + perc_read_gk + perc_word_gk)/3)
-# summary(scores_gk$perc_average_gk)
-# hist(scores_gk$perc_average_gk)
 
 # Calculate Summary Statistics (See: Krüger (1999), p. 508)
 scores_gk %>% 
   filter(gkclasstype=="REGULAR CLASS" | gkclasstype=="REGULAR + AIDE CLASS") %>%
-    summarise(mean_av = mean(perc_average_gk), mean_math = mean(perc_maths_gk), mean_read = mean(perc_read_gk), mean_word = mean(perc_word_gk))
+    summarise(mean_av = mean(perc_av_gk), mean_math = mean(perc_maths_gk), mean_read = mean(perc_read_gk), mean_word = mean(perc_word_gk))
 
 # We can already see that SMALL classes seem to have a positive impact on average (interestingly biggest effect on reading abilities (kind of makes sense))
 ```
@@ -110,7 +104,7 @@ Mean Scores for students in small classes in Kindergarten:
 ```{r echo=TRUE}
 scores_gk %>% 
   filter(gkclasstype=="SMALL CLASS") %>%
-    summarise(mean_av = mean(perc_average_gk), mean_math = mean(perc_maths_gk), mean_read = mean(perc_read_gk), mean_word = mean(perc_word_gk))    
+    summarise(mean_av = mean(perc_av_gk), mean_math = mean(perc_maths_gk), mean_read = mean(perc_read_gk), mean_word = mean(perc_word_gk))    
 ```
 
 The results for kindergarten students already show a positive effect of *SMALL* classes.
@@ -122,14 +116,14 @@ Mean Scores for students in regular classes in Grade 1:
 ```{r echo=TRUE}
 reg_scores_g1 <- 
   main_data_g1 %>% filter(g1classtype=="REGULAR CLASS" | g1classtype=="REGULAR + AIDE CLASS", !is.na(g1tmathss) & !is.na(g1treadss) & !is.na(g1wordskillss) )  %>%
-    select(stdntid,g1classtype,g1tmathss,g1treadss, g1wordskillss, g1schid  )
+    select(stdntid,g1classtype,g1tmathss,g1treadss, g1wordskillss, g1schid, g1aversc)
 
 small_scores_g1 <- 
   main_data_g1 %>% filter(g1classtype=="SMALL CLASS", !is.na(g1tmathss) & !is.na(g1treadss) & !is.na(g1wordskillss) )  %>%
-    select(stdntid,g1classtype,g1tmathss,g1treadss, g1wordskillss, g1schid  )
+    select(stdntid,g1classtype,g1tmathss,g1treadss, g1wordskillss, g1schid, g1aversc)
 
 reg_scores_g1 <- 
-  reg_scores_g1 %>% mutate(perc_maths_g1=percent_rank(g1tmathss), perc_read_g1 =percent_rank(g1treadss), perc_word_g1=percent_rank(g1wordskillss))
+  reg_scores_g1 %>% mutate(perc_maths_g1=percent_rank(g1tmathss), perc_read_g1 =percent_rank(g1treadss), perc_word_g1=percent_rank(g1wordskillss), perc_av_g1=percent_rank(g1aversc))
 
 scores_g1 <- reg_scores_g1
 
@@ -138,17 +132,14 @@ for (i in 1:nrow(small_scores_g1)) {
   obs <- small_scores_g1[i,]
   # add to regular observations and compute percentile ranks
   temp <- add_row(reg_scores_g1, obs) %>% 
-    mutate(perc_maths_g1=percent_rank(g1tmathss), perc_read_g1 =percent_rank(g1treadss), perc_word_g1=percent_rank(g1wordskillss))
+    mutate(perc_maths_g1=percent_rank(g1tmathss), perc_read_g1 =percent_rank(g1treadss), perc_word_g1=percent_rank(g1wordskillss), perc_av_g1=percent_rank(g1aversc))
   # add observation to merged scores
   scores_g1 <-  add_row(scores_g1, tail(temp,1))
 }
 
-scores_g1 <- 
-  scores_g1 %>% mutate(perc_average_g1 = (perc_maths_g1 + perc_read_g1 + perc_word_g1)/3)
-
 scores_g1 %>% 
   filter(g1classtype=="REGULAR CLASS" | g1classtype=="REGULAR + AIDE CLASS") %>%
-    summarise(mean_av = mean(perc_average_g1), mean_math = mean(perc_maths_g1), mean_read = mean(perc_read_g1), mean_word = mean(perc_word_g1))
+    summarise(mean_av = mean(perc_av_g1), mean_math = mean(perc_maths_g1), mean_read = mean(perc_read_g1), mean_word = mean(perc_word_g1))
 
 ```
 Mean Scores for students in small classes in Grade 1: 
@@ -156,7 +147,7 @@ Mean Scores for students in small classes in Grade 1:
 ```{r echo=TRUE}
 scores_g1 %>% 
   filter(g1classtype=="SMALL CLASS") %>%
-    summarise(mean_av = mean(perc_average_g1), mean_math = mean(perc_maths_g1), mean_read = mean(perc_read_g1), mean_word = mean(perc_word_g1))    
+    summarise(mean_av = mean(perc_av_g1), mean_math = mean(perc_maths_g1), mean_read = mean(perc_read_g1), mean_word = mean(perc_word_g1))    
 ```
 
 Mean Scores for students in regular classes in Grade 2: 
@@ -164,14 +155,14 @@ Mean Scores for students in regular classes in Grade 2:
 ```{r echo=TRUE}
 reg_scores_g2 <- 
   main_data_g2 %>% filter(g2classtype=="REGULAR CLASS" | g2classtype=="REGULAR + AIDE CLASS", !is.na(g2tmathss) & !is.na(g2treadss) & !is.na(g2wordskillss) )  %>%
-    select(stdntid,g2classtype,g2tmathss,g2treadss, g2wordskillss, g2schid )
+    select(stdntid,g2classtype,g2tmathss,g2treadss, g2wordskillss, g2schid, g2aversc )
 
 small_scores_g2 <- 
   main_data_g2 %>% filter(g2classtype=="SMALL CLASS", !is.na(g2tmathss) & !is.na(g2treadss) & !is.na(g2wordskillss) )  %>%
-    select(stdntid,g2classtype,g2tmathss,g2treadss, g2wordskillss, g2schid  )
+    select(stdntid,g2classtype,g2tmathss,g2treadss, g2wordskillss, g2schid, g2aversc)
 
 reg_scores_g2 <- 
-  reg_scores_g2 %>% mutate(perc_maths_g2=percent_rank(g2tmathss), perc_read_g2 =percent_rank(g2treadss), perc_word_g2=percent_rank(g2wordskillss))
+  reg_scores_g2 %>% mutate(perc_maths_g2=percent_rank(g2tmathss), perc_read_g2 =percent_rank(g2treadss), perc_word_g2=percent_rank(g2wordskillss), perc_av_g2=percent_rank(g2aversc))
 
 scores_g2 <- reg_scores_g2
 
@@ -185,12 +176,10 @@ for (i in 1:nrow(small_scores_g2)) {
   scores_g2 <-  add_row(scores_g2, tail(temp,1))
 }
 
-scores_g2 <- 
-  scores_g2 %>% mutate(perc_average_g2 = (perc_maths_g2 + perc_read_g2 + perc_word_g2)/3)
 
 scores_g2 %>% 
   filter(g2classtype=="REGULAR CLASS" | g2classtype=="REGULAR + AIDE CLASS") %>%
-    summarise(mean_av = mean(perc_average_g2), mean_math = mean(perc_maths_g2), mean_read = mean(perc_read_g2), mean_word = mean(perc_word_g2))
+    summarise(mean_av = mean(perc_av_g2), mean_math = mean(perc_maths_g2), mean_read = mean(perc_read_g2), mean_word = mean(perc_word_g2))
 
 ```
 
@@ -199,7 +188,7 @@ Mean Scores for students in small classes in Grade 2:
 ```{r echo=TRUE}
 scores_g2 %>% 
   filter(g2classtype=="SMALL CLASS") %>%
-    summarise(mean_av = mean(perc_average_g2), mean_math = mean(perc_maths_g2), mean_read = mean(perc_read_g2), mean_word = mean(perc_word_g2))
+    summarise(mean_av = mean(perc_av_g2), mean_math = mean(perc_maths_g2), mean_read = mean(perc_read_g2), mean_word = mean(perc_word_g2))
 # word has more below 0.5 means (many equal scores?)    
 ```
 
@@ -209,11 +198,11 @@ Mean Scores for students in regular classes in Grade 3:
 ```{r echo=TRUE}
 reg_scores_g3 <- 
   main_data_g3 %>% filter(g3classtype=="REGULAR CLASS" | g3classtype=="REGULAR + AIDE CLASS", !is.na(g3tmathss) & !is.na(g3treadss) & !is.na(g3wordskillss) )  %>%
-    select(stdntid,g3classtype,g3tmathss,g3treadss, g3wordskillss, g3schid  )
+    select(stdntid,g3classtype,g3tmathss,g3treadss, g3wordskillss, g3schid,g3aversc  )
 
 small_scores_g3 <- 
   main_data_g3 %>% filter(g3classtype=="SMALL CLASS", !is.na(g3tmathss) & !is.na(g3treadss) & !is.na(g3wordskillss) )  %>%
-    select(stdntid, g3classtype,g3tmathss,g3treadss, g3wordskillss, g3schid  )
+    select(stdntid, g3classtype,g3tmathss,g3treadss, g3wordskillss, g3schid,g3aversc  )
 
 reg_scores_g3 <- 
   reg_scores_g3 %>% mutate(perc_maths_g3=percent_rank(g3tmathss), perc_read_g3 =percent_rank(g3treadss), perc_word_g3=percent_rank(g3wordskillss))
@@ -229,9 +218,6 @@ for (i in 1:nrow(small_scores_g3)) {
   # add observation to merged scores
   scores_g3 <-  add_row(scores_g3, tail(temp,1))
 }
-
-scores_g3 <- 
-  scores_g3 %>% mutate(perc_average_g3 = (perc_maths_g3 + perc_read_g3 + perc_word_g3)/3)
 
 scores_g3 %>% 
   filter(g3classtype=="REGULAR CLASS" | g3classtype=="REGULAR + AIDE CLASS") %>%
@@ -254,7 +240,7 @@ scores_all <-
     full_join(scores_g1, by = "stdntid") %>% 
       full_join(scores_g2, by = "stdntid") %>% 
         full_join(scores_g3, by = "stdntid") %>% 
-          select(stdntid, perc_average_g3, perc_maths_g3, perc_read_g3, perc_word_g3, perc_average_g2, perc_maths_g2, perc_read_g2, perc_word_g2, perc_average_g1, perc_maths_g1, perc_read_g1, perc_word_g1,perc_average_gk, perc_maths_gk, perc_read_gk, perc_word_gk)
+          select(stdntid, perc_av_g3, perc_maths_g3, perc_read_g3, perc_word_g3, perc_av_g2, perc_maths_g2, perc_read_g2, perc_word_g2, perc_av_g1, perc_maths_g1, perc_read_g1, perc_word_g1,perc_av_gk, perc_maths_gk, perc_read_gk, perc_word_gk)
 # we get a problem here, because covariates are in different categories, better make a dataset with new variables and merge them with the main_data
 main_data <- 
   main_data %>% full_join(scores_all, by="stdntid")
@@ -268,14 +254,14 @@ This approach diverges from Krüger et al., but might be helpful for **compositi
 
 small_scores_gk_sc <- 
   main_data_gk %>% filter(gkclasstype=="SMALL CLASS", !is.na(gktmathss) & !is.na(gktreadss) & !is.na(gkwordskillss) )  %>%
-    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid  )
+    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid, gkaversc  )
 
 
 # We simply repeat the procedure with data grouped by school 
 reg_scores_gk_sc <- 
   reg_scores_gk %>%
     group_by(gkschid) %>% 
-      mutate(perc_maths_gk_sc=percent_rank(gktmathss), perc_read_gk_sc =percent_rank(gktreadss), perc_word_gk_sc=percent_rank(gkwordskillss)) %>%
+      mutate(perc_maths_gk_sc=percent_rank(gktmathss), perc_read_gk_sc =percent_rank(gktreadss), perc_word_gk_sc=percent_rank(gkwordskillss), perc_av_gk_sc=percent_rank(gkaversc)) %>%
         ungroup()
 
 scores_gk_sc <- reg_scores_gk_sc
@@ -286,24 +272,20 @@ for (i in 1:nrow(small_scores_gk_sc)) {
   # add to regular observations and compute percentile ranks
   temp <- add_row(reg_scores_gk_sc, obs) %>%
     group_by(gkschid) %>%
-    mutate(perc_maths_gk_sc=percent_rank(gktmathss), perc_read_gk_sc =percent_rank(gktreadss), perc_word_gk_sc=percent_rank(gkwordskillss)) %>% ungroup()
+    mutate(perc_maths_gk_sc=percent_rank(gktmathss), perc_read_gk_sc =percent_rank(gktreadss), perc_word_gk_sc=percent_rank(gkwordskillss), perc_av_gk_sc=percent_rank(gkaversc)) %>% ungroup()
   # add observation to merged scores
   scores_gk_sc <-  add_row(scores_gk_sc, tail(temp,1))
 }
 
-# calculate average of the scores
-scores_gk_sc <- 
-  scores_gk_sc %>% mutate(perc_average_gk_sc = (perc_maths_gk_sc + perc_read_gk_sc + perc_word_gk_sc)/3)
-
 # Grade 1
 small_scores_g1_sc <- 
   main_data_g1 %>% filter(g1classtype=="SMALL CLASS", !is.na(g1tmathss) & !is.na(g1treadss) & !is.na(g1wordskillss) )  %>%
-    select(stdntid,g1classtype,g1tmathss,g1treadss, g1wordskillss, g1schid  )
+    select(stdntid,g1classtype,g1tmathss,g1treadss, g1wordskillss, g1schid, g1aversc)
 
 reg_scores_g1_sc <- 
   reg_scores_g1 %>%
     group_by(g1schid) %>% 
-      mutate(perc_maths_g1_sc=percent_rank(g1tmathss), perc_read_g1_sc =percent_rank(g1treadss), perc_word_g1_sc=percent_rank(g1wordskillss))  %>%
+      mutate(perc_maths_g1_sc=percent_rank(g1tmathss), perc_read_g1_sc =percent_rank(g1treadss), perc_word_g1_sc=percent_rank(g1wordskillss), perc_av_g1_sc=percent_rank(g1aversc))  %>%
         ungroup()
 
 scores_g1_sc <- reg_scores_g1_sc
@@ -314,25 +296,21 @@ for (i in 1:nrow(small_scores_g1_sc)) {
   # add to regular observations and compute percentile ranks
   temp <- add_row(reg_scores_g1_sc, obs) %>%
     group_by(g1schid) %>%
-    mutate(perc_maths_g1_sc=percent_rank(g1tmathss), perc_read_g1_sc =percent_rank(g1treadss), perc_word_g1_sc=percent_rank(g1wordskillss))  %>%
+    mutate(perc_maths_g1_sc=percent_rank(g1tmathss), perc_read_g1_sc =percent_rank(g1treadss), perc_word_g1_sc=percent_rank(g1wordskillss), perc_av_g1_sc=percent_rank(g1aversc))  %>%
         ungroup()
   # add observation to merged scores
   scores_g1_sc <-  add_row(scores_g1_sc, tail(temp,1))
 }
 
-# calculate average of the scores
-scores_g1_sc <- 
-  scores_g1_sc %>% mutate(perc_average_g1_sc = (perc_maths_g1_sc + perc_read_g1_sc + perc_word_g1_sc)/3)
-
 # Grade 2
 small_scores_g2_sc <- 
   main_data_g2 %>% filter(g2classtype=="SMALL CLASS", !is.na(g2tmathss) & !is.na(g2treadss) & !is.na(g2wordskillss) )  %>%
-    select(stdntid,g2classtype,g2tmathss,g2treadss, g2wordskillss, g2schid  )
+    select(stdntid,g2classtype,g2tmathss,g2treadss, g2wordskillss, g2schid, g2aversc  )
 
 reg_scores_g2_sc <- 
   reg_scores_g2 %>%
     group_by(g2schid) %>% 
-      mutate(perc_maths_g2_sc=percent_rank(g2tmathss), perc_read_g2_sc =percent_rank(g2treadss), perc_word_g2_sc=percent_rank(g2wordskillss))  %>%
+      mutate(perc_maths_g2_sc=percent_rank(g2tmathss), perc_read_g2_sc =percent_rank(g2treadss), perc_word_g2_sc=percent_rank(g2wordskillss), perc_av_g2_sc=percent_rank(g2aversc))  %>%
         ungroup()
 
 scores_g2_sc <- reg_scores_g2_sc
@@ -343,25 +321,22 @@ for (i in 1:nrow(small_scores_g2_sc)) {
   # add to regular observations and compute percentile ranks
   temp <- add_row(reg_scores_g2_sc, obs) %>%
     group_by(g2schid) %>%
-    mutate(perc_maths_g2_sc=percent_rank(g2tmathss), perc_read_g2_sc =percent_rank(g2treadss), perc_word_g2_sc=percent_rank(g2wordskillss))  %>%
+    mutate(perc_maths_g2_sc=percent_rank(g2tmathss), perc_read_g2_sc =percent_rank(g2treadss), perc_word_g2_sc=percent_rank(g2wordskillss), perc_av_g2_sc=percent_rank(g2aversc))  %>%
         ungroup()
   # add observation to merged scores
   scores_g2_sc <-  add_row(scores_g2_sc, tail(temp,1))
 }
 
-# calculate average of the scores
-scores_g2_sc <- 
-  scores_g2_sc %>% mutate(perc_average_g2_sc = (perc_maths_g2_sc + perc_read_g2_sc + perc_word_g2_sc)/3)
 
 # Grade 3
 small_scores_g3_sc <- 
   main_data_g3 %>% filter(g3classtype=="SMALL CLASS", !is.na(g3tmathss) & !is.na(g3treadss) & !is.na(g3wordskillss) )  %>%
-    select(stdntid,g3classtype,g3tmathss,g3treadss, g3wordskillss, g3schid  )
+    select(stdntid,g3classtype,g3tmathss,g3treadss, g3wordskillss, g3schid , g3aversc )
 
 reg_scores_g3_sc <- 
   reg_scores_g3 %>%
     group_by(g3schid) %>% 
-      mutate(perc_maths_g3_sc=percent_rank(g3tmathss), perc_read_g3_sc =percent_rank(g3treadss), perc_word_g3_sc=percent_rank(g3wordskillss))  %>%
+      mutate(perc_maths_g3_sc=percent_rank(g3tmathss), perc_read_g3_sc =percent_rank(g3treadss), perc_word_g3_sc=percent_rank(g3wordskillss), perc_av_g3_sc=percent_rank(g3aversc))  %>%
         ungroup()
 
 scores_g3_sc <- reg_scores_g3_sc
@@ -372,15 +347,11 @@ for (i in 1:nrow(small_scores_g3_sc)) {
   # add to regular observations and compute percentile ranks
   temp <- add_row(reg_scores_g3_sc, obs) %>%
     group_by(g3schid) %>%
-    mutate(perc_maths_g3_sc=percent_rank(g3tmathss), perc_read_g3_sc =percent_rank(g3treadss), perc_word_g3_sc=percent_rank(g3wordskillss))  %>%
+    mutate(perc_maths_g3_sc=percent_rank(g3tmathss), perc_read_g3_sc =percent_rank(g3treadss), perc_word_g3_sc=percent_rank(g3wordskillss), perc_av_g3_sc=percent_rank(g3aversc))  %>%
         ungroup()
   # add observation to merged scores
   scores_g3_sc <-  add_row(scores_g3_sc, tail(temp,1))
 }
-
-# calculate average of the scores
-scores_g3_sc <- 
-  scores_g3_sc %>% mutate(perc_average_g3_sc = (perc_maths_g3_sc + perc_read_g3_sc + perc_word_g3_sc)/3)
 
 
 scores_all_sc <- 
@@ -388,12 +359,22 @@ scores_all_sc <-
     full_join(scores_g1_sc, by = "stdntid") %>% 
       full_join(scores_g2_sc, by = "stdntid") %>% 
         full_join(scores_g3_sc, by = "stdntid") %>% 
-          select(stdntid, perc_average_g3_sc, perc_maths_g3_sc, perc_read_g3_sc, perc_word_g3_sc, perc_average_g2_sc, perc_maths_g2_sc, perc_read_g2_sc, perc_word_g2_sc, perc_average_g1_sc, perc_maths_g1_sc, perc_read_g1_sc, perc_word_g1_sc,perc_average_gk_sc, perc_maths_gk_sc, perc_read_gk_sc, perc_word_gk_sc)
+          select(stdntid, perc_av_g3_sc, perc_maths_g3_sc, perc_read_g3_sc, perc_word_g3_sc, perc_av_g2_sc, perc_maths_g2_sc, perc_read_g2_sc, perc_word_g2_sc, perc_av_g1_sc, perc_maths_g1_sc, perc_read_g1_sc, perc_word_g1_sc,perc_av_gk_sc, perc_maths_gk_sc, perc_read_gk_sc, perc_word_gk_sc)
 # we get a problem here, because covariates are in different categories, better make a dataset with new variables and merge them with the main_data
 main_data <- 
   main_data %>% full_join(scores_all_sc, by="stdntid")
 ```
 
+
+We expect percentile ranks for regular students within schools to follow a uniform distribution. The Variation to the distribution of test scores from students in small classes is of interest.
+
+```{r echo=TRUE}
+# choose a school
+# unique(main_data$gkschid)
+test <- 
+  main_data %>% filter(gkschid==169229 & gkclasstype!="SMALL CLASS")
+hist(test$perc_average_gk_sc)
+```
 
 ### Race into 3 factors: White/Asian, Black, Other
 
