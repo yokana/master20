@@ -1,0 +1,369 @@
+---
+title: "Analysis of STAR as Compositional Data set"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, include=FALSE}
+library(tidyverse)
+library(doBy)
+library(broom)
+library("data.table")
+library(magrittr) 
+library(gtools) # various programming tools
+library("robCompositions") # for compData analysis
+library(compositions)
+library(ggplot2) # for plots
+library(gridExtra) # for several plots in one window
+library(kableExtra) # for HTML tables
+library(collapse) # for faster computation of sample statistics
+```
+
+```{r echo=TRUE}
+load("/home/hanes/Documents/Projects/2020_Master_STAR/master20/data/main_data.RData")    
+```
+
+Following, the STAR data set is recoded as a *composition*, where each *class* consists of several components. The steps of analysis are mostly a reproduction from the work of Boogart et al.(2013) and Filzmoser et al. (2019).
+
+
+# Compositional Data Analysis
+
+## Wrapping up CompData (Select Variables for CompAna and recode)
+
+
+As a first step we select those students who were participated in STAR since the kindergarten. It is possible to use the `teacher ID` as a unique identifier for each class to collapse the data at the class level.
+
+```{r echo=TRUE}
+# select variables, Classes by Teacher ID
+comp_data_gk <- 
+  main_data %>% filter(X=="YES") %>%
+  select(gender, race, X, gkclasstype, gkclasssize, gkfreelunch, gktchid, perc_average_gk, perc_average_g1, perc_average_g2, perc_average_g3, gkschid, hssattot, hsacttot, gksurban, perc_average_gk_sc, perc_average_g1_sc, perc_average_g2_sc, perc_average_g3_sc )
+
+# comp_data_gk %>% group_by(gktchid) %>% summarise(n = n(), classsize = max(gkclasssize, na.rm = TRUE)) 
+# teacher ID works!
+```
+
+- we have 325 different classes in kindergarten
+
+**COMMENT**: We have Data on all 11.601 students in kindergarten, but only 6325 participated in STAR at this point
+
+### Compute share of students in class 
+
+It is straight forward to compute shares of the explanatory variables: `gender`, `race` and `free lunch`.
+
+```{r echo=TRUE}
+# collapse data into group shares by class (teacher ID)
+comp_data_gender <- 
+  comp_data_gk %>% group_by(gktchid, gender) %>% 
+    summarise(n = n(), .groups="drop_last" ) %>% 
+      mutate(share_gender = n / sum(n)) %>% 
+        pivot_wider(id_cols =gktchid, names_from=gender, values_from= share_gender)
+
+comp_data_race <- 
+  comp_data_gk %>% group_by(gktchid, race) %>% 
+    summarise(n = n(), .groups="drop_last" ) %>% 
+      mutate(share_race = n / sum(n)) %>% 
+        pivot_wider(id_cols =  gktchid, names_from=race, values_from=share_race )
+
+comp_data_lunch <- 
+  comp_data_gk %>% group_by(gktchid, gkfreelunch) %>% 
+    summarise(n = n(), .groups="drop_last" ) %>% 
+      mutate(share_lunch = n / sum(n)) %>% 
+        pivot_wider(id_cols =  gktchid, names_from=gkfreelunch, values_from=share_lunch)
+```
+
+Computing the dependent performance variable requires more decisions. Since so far average test results are continuous, we need to reconstruct them as a categorical variable for compositional analysis. It seems natural to start with five categories (very bad, bad, average, good, very good). 
+Of course **supporting literature** is needed to justify this construction.
+
+
+```{r echo=TRUE}
+# we need to construct five bins out of the average percentiles for each student
+comp_data_gk <- comp_data_gk %>% mutate(quin_av_gk = cut(perc_average_gk,5)) 
+
+summary(comp_data_gk$quin_av_gk)
+```
+We construct five bins out of the percentile ranks of all kindergarten students. 
+
+**COMMENT**: *Data cleaning* - check negative value (students from `small` classes with lower test results than the lowest ranks from regular classes) and NAs.
+
+
+```{r echo=TRUE}
+comp_data_avScore_gk <- 
+    comp_data_gk %>% group_by(gktchid, quin_av_gk) %>% 
+    summarise(n = n(), .groups = "drop_last") %>% 
+      mutate(share_av_gk = n / sum(n)) %>% 
+        pivot_wider(id_cols=gktchid, names_from=quin_av_gk, values_from=share_av_gk )
+# rename quintile columns
+names(comp_data_avScore_gk) <- c("gktchid", "very.bad", "bad", "average", "good", "very.good", "Missing")            
+# replace NA values in quintile with value zero (very small number because of log ratios)
+ comp_data_avScore_gk[is.na(comp_data_avScore_gk)] <- 0.01
+
+# Display results by class
+ comp_data_avScore_gk[1:5,] %>% 
+   kbl(caption = "Classes as composition by average test results for all students in STAR", digits = 2) %>% 
+    kable_paper("hover")
+```
+For now, we replace `NAs` with very small values to make the transformation into log ratios possible. This solution is not optimal and should be **replaced** later.
+
+**COMMENT**: On first sight, variation between class compositions seems relatively high. This is probably due to **school effects**. Since random assignment takes place within schools, it makes sense to calculate quintiles within schools. For now, lets proceed with both options. 
+
+
+**COMMENT**: There seem to be a few classes with a very high share of missings.
+
+```{r echo=TRUE}
+# we compute the quintiles on school level, i.d. every school has its own levels
+comp_data_gk <- comp_data_gk %>% mutate(quin_av_gk_sc = cut(perc_average_gk_sc,5)) 
+# summary(comp_data_gk$quin_av_gk_sc)    
+# test <- comp_data_gk %>% filter(gkschid=="112038")
+# # for every school we have specific quintiles for each student; overall quintiles should have a uniform distribution per school
+# hist <- test %>% group_by(gktchid, quin_av_gk_sc) %>% 
+#     summarise(n = n() )
+
+comp_data_avScore_gk_sc <- 
+  # we group the data by class and quintile and count the numbers
+    comp_data_gk %>% group_by(gktchid, quin_av_gk_sc) %>% 
+    summarise(n = n(), .groups = "drop_last" ) %>% 
+      mutate(share_av_gk = n / sum(n)) %>% 
+        pivot_wider(id_cols=gktchid, names_from=quin_av_gk_sc, values_from=share_av_gk )
+# rename quintile columns
+names(comp_data_avScore_gk_sc) <- c("gktchid", "very.bad", "bad", "average", "good", "very.good", "Missing")            
+# replace NA values in quintile with value zero (very small number because of log ratios)
+ comp_data_avScore_gk_sc[is.na(comp_data_avScore_gk_sc)] <- 0.01
+
+# Display results by class
+ comp_data_avScore_gk_sc[1:5,] %>% 
+   kbl(caption = "Classes as compositions by average test results by school", digits = 2) %>% 
+    kable_paper("hover", full_width = FALSE)
+```
+
+Even within after controlling for school effects the variation of class compositions seems to be high.
+
+Now we include the treatment variable `SMALL` and additional control on school level `urban` and merge all variables into one data set.
+
+```{r echo=TRUE}
+# How do I collapse Data correctly??
+comp_data_class <- 
+    comp_data_gk %>% group_by(gktchid, gkclasstype) %>% summarise(.groups = "drop_last")
+
+
+# include rural/urban level as well
+comp_data_urban <- 
+    comp_data_gk %>% group_by(gktchid, gksurban) %>% summarise(.groups = "drop_last" )
+
+
+# merge all compositional data by class (teacher ID)
+comp_data <- 
+  comp_data_gender %>% 
+    full_join(comp_data_race, by = "gktchid") %>%
+      full_join(comp_data_lunch, by = "gktchid") %>% 
+        full_join( comp_data_avScore_gk, by = "gktchid") %>%
+          full_join( comp_data_avScore_gk_sc, by = "gktchid") %>%
+            full_join(comp_data_class, by = "gktchid")
+    
+
+ comp_data[1:10,1:19] %>% 
+   kbl(caption = "Compositional Data set on class level", digits = 2) %>% 
+    kable_paper("hover", full_width = TRUE)
+```
+
+Let's have a quick view on the summmary statistics:
+
+```{r echo=TRUE}
+descr(comp_data, cols = is.categorical)    
+```
+
+Shares of Students by class categoy:
+```{r echo=TRUE}
+  aperm(qsu(comp_data, ~gkclasstype, cols = is.numeric))  
+```
+
+
+# Nullmodel 
+
+## CompData as dependent variable
+
+First goal is to visualize the relation between the standard treatment variable `SMALL` and the composition of `Average Test Scores`.
+
+
+```{r echo=TRUE}
+# vectorize dependent Variable
+Y.1 <- acomp(comp_data[,c("very.bad.x", "bad.x", "average.x", "good.x", "very.good.x")])
+Y.2 <- acomp(comp_data[,c("very.bad.y", "bad.y", "average.y", "good.y", "very.good.y")])
+
+Covariables <- comp_data[, c("gkclasstype", "WHITE/ASIAN", "FREE LUNCH")] 
+# recode Categorical Variable gkclasstype as DUMMY
+Covariables <- Covariables %>% mutate(classDummy = ifelse(gkclasstype=="SMALL CLASS", 1,0))
+# Covariates need to be stored into seperated vectors
+X1 <- factor(Covariables$classDummy)
+X2 <- Covariables$`WHITE/ASIAN`
+X3 <- Covariables$`FREE LUNCH`
+
+```
+
+#### Ternary Diagram of Test Performance by Class type
+
+1. Using the ungrouped test results
+
+```{r echo=TRUE}
+# Vusalize Dependent Variable by SMALL DUMMY in ternary diagrams
+opar = par(xpd=NA,no.readonly=TRUE)
+plot(Y.1,col=c("red","green")[X1])
+legend(x=0.75,y=0.0,abbreviate(levels(X1), minlength=1),
+       pch=20,col=c("red","green"),yjust=0)
+par(opar)
+# legend(locator(1),levels(X1),
+#        pch=20,col=c("red","green"),xpd=NA,yjust=0)    
+```
+
+2. Using the test results by school
+
+```{r echo=TRUE}
+# Vusalize Dependent Variable by SMALL DUMMY in ternary diagrams
+opar = par(xpd=NA,no.readonly=TRUE)
+plot(Y.2,col=c("red","green")[X1])
+legend(x=0.75,y=0.0,abbreviate(levels(X1), minlength=1),
+       pch=20,col=c("red","green"),yjust=0)
+par(opar)
+# legend(locator(1),levels(X1),
+#        pch=20,col=c("red","green"),xpd=NA,yjust=0)    
+```
+
+Relative Share of very good students seems to be related to SMALL CLASSES (our treatment). Grouping by school seems to make a lot of sense in this set up.
+
+
+
+#### Regression Model
+
+For Regression, we need to transform the percentage shares into the Aitchison Geometry and run a model for each part. Regression Coefficients can be transformed to get more interpretable results. But first, lets look if we identify any meaningful effects.
+
+1. Regression of ungrouped average test results
+
+```{r echo=TRUE}
+# reproduction of Filzmoser, 2019, p.195ff
+
+# At first, seperate dependent and independent part of the data
+# For now, we ignore missings
+dep_compVar.1 <- as.data.table(comp_data[, c("very.bad.x", "bad.x", "average.x", "good.x", "very.good.x") ] ) %>% as.matrix()
+# Since we cant deal with ZEROS, we replace them by a very small Number for now
+ind_compVar <- comp_data[, c("gkclasstype")] 
+# recode Categorical Variable gkclasstype as DUMMY
+ind_compVar <- ind_compVar %>% mutate(classDummy = ifelse(gkclasstype=="SMALL CLASS", 1,0))
+
+# initialize empty list to collect results
+allres1 <- vector("list", ncol(dep_compVar.1))
+# loop over all compositional parts
+for (j in 1:ncol(dep_compVar.1)){
+  zj <- pivotCoord(dep_compVar.1, pivotvar = j)
+  # use only first coordinate
+  res1 <- lm(zj[,1] ~ ind_compVar$classDummy)
+  # result for the first coordinate
+  allres1[[j]] <- summary(res1)
+}
+
+
+res1 <- rbindlist(lapply(allres1, tidy))
+res1$term <- c("Intercept", "very.bad", "Intercept", "bad", "Intercept", "average", "Intercept", "good", "Intercept", "very.good")
+res1[, c(1:3, 5)] # selection of estimate
+```
+
+This first model tells us, that `SMALL CLASS` has a significant negative impact on "bad" (shares of bad students are lower) and a **positive** significant effect on "very good" students (shares are higher).
+
+
+2. Regression of test results grouped by school
+
+```{r echo=TRUE}
+dep_compVar.2 <- as.data.table(comp_data[, c("very.bad.y", "bad.y", "average.y", "good.y", "very.good.y") ] ) %>% as.matrix()
+
+# initialize empty list to collect results
+allres2 <- vector("list", ncol(dep_compVar.2))
+# loop over all compositional parts
+for (j in 1:ncol(dep_compVar.2)){
+  zj <- pivotCoord(dep_compVar.2, pivotvar = j)
+  # use only first coordinate
+  res2 <- lm(zj[,1] ~ ind_compVar$classDummy)
+  # result for the first coordinate
+  allres2[[j]] <- summary(res2)
+}
+
+
+res2 <- rbindlist(lapply(allres2, tidy))
+res2$term <- c("Intercept", "very.bad", "Intercept", "bad", "Intercept", "average", "Intercept", "good", "Intercept", "very.good")
+res2[, c(1:3, 5)] # selection of estimate
+```    
+
+After controlling for school, results appear to be much more precise. We check the R squared measure for both models
+
+First Model:
+```{r echo=TRUE}
+rbindlist(lapply(allres1, glance))[, 1:2]
+```
+
+Second Model:
+```{r echo=TRUE}
+rbindlist(lapply(allres2, glance))[, 1:2]
+```
+
+In both cases a very small amount of variation is explained.
+
+
+## CompData as explanatory (independent Variable)
+
+```{r echo=TRUE}
+# we need to merge the compositional data with the individual level
+# we can do so using the teacher ID
+# remeber that we need to control for schools
+ind_comp_data <- 
+  main_data %>% left_join(comp_data, by = "gktchid") %>%
+  select(c("gktchid", "gkschid", "MALE", "FEMALE", "FREE LUNCH", "NON-FREE LUNCH", "very.bad.y", "bad.y", "average.y", "good.y", "very.good.y", "perc_average_gk", "perc_average_gk_sc", "gkaversc", "g3aversc"))
+
+# remove NAs and pick one school
+ind_comp_data_woNA <- 
+  ind_comp_data %>% filter(!is.na(gkaversc) & gkschid==159171) 
+# define compositional covariates
+# pick NON-FREE Lunch
+X <- acomp(ind_comp_data_woNA[,c(5,6)])
+# define dependent variable
+Y <- ind_comp_data_woNA$gkaversc
+
+```
+
+Pick a school and visualize compisitional data with dependent avariable (average test score in kindergarten). Following the share of `FREE LUNCH` students is used. 
+
+```{r echo=TRUE}
+# 1. use size of color as a covariate in a ternary diagram
+rescale = function(xin,rout,rin=range(xin, na.rm=FALSE)){
+  xout = rout[1] + (xin-rin[1])*(rout[2]-rout[1])/(rin[2]-rin[1])
+  return(xout)
+}
+# rescale log of biomass as kind of percentile
+hist(Y)
+Ycex = rescale(Y, c(0.5,2) )
+
+
+# Use pairwise Log Ratios for two components
+# Pairwise Log-Ratio Plot Matrix ------------------------------------------
+opar <- par(mfrow=c(2,2),mar=c(1,1,0.5,0.5), oma=c(3,3,0,0))
+# compute pairwise log ratios for each component and visualize by dependent variable
+for(i in 1:2){
+  for(j in 1:2){
+    plot(log(X[,i]/X[,j]),Y,pch=ifelse(i!=j,19,""))
+    if(i==j){text(x=0,y=mean(range(Y)),
+                  labels=colnames(X)[i],cex=1.5)}
+  }
+}
+mtext(text=c("pairwise log-ratio","dependent variable"),
+      side=c(1,2),at=0.5,line=2,outer=TRUE)
+par(opar)
+```
+
+On average results are better for a higher relative share of `NON-FREE LUNCH` Students, i.d. when the relative share of `NON-FREE LUNCH` students is higher than the share of `FREE LUNCH` students. We can  also see that the size of that difference plays a role.  
+
+Next Step: Compare different schools (especially those with higher variation); choose different covariates
