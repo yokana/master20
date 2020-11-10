@@ -4,11 +4,11 @@ author: "Johannes Wagner"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
-  toc: yes
-code_folding: hide
+    toc: yes
+    code_folding: hide
 ---
   
-  ```{r chunk_setup, include=FALSE, eval=TRUE}
+```{r chunk_setup, include=FALSE, eval=TRUE}
 knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
                       eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
                       fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
@@ -19,6 +19,7 @@ library(tidyverse)
 library(kdensity) # density estimation
 library(lattice) # for histograms with relative frequencies
 library(FDboost) # for functional analysis
+library(compositions) # for clr transformation
 ```
 
 
@@ -111,17 +112,41 @@ for (i in 1:length(densities)){
 }  
 
 
-# create a list with all variables for functional analysis  
-star <- list(classDen_gk = denMatrix_1, 
-             classDen_gk_sc = denMatrix_2,
-             evPoints = eqdist,
-             ClassType = listObjClasstype,
-             School = listObjSchool) 
-
 
 
 ```
 
+## CLR Transformation
+
+This section follows the theoretical outline from [Boogart et al. 2013, p. 41ff] and uses the corresponding package `compositions`, with `clr` and `clrInv`.
+
+```{r echo=TRUE}
+# package treats every row as a composition and returns the clr coordinates
+# # Since we deal with densities, we do have relational data
+# test <- denMatrix_1[1,]
+# # we could normalize them to get a sum constrain (but we dont really need to?)
+# test <- test/100 # normalization doesnt really matter for clr transformation
+# sum(test)
+# # as we cans see, we have a small error margins since we only deal with 100 evaluation points
+# test <- clr(test)
+# # thats obviously a relative measure of points
+# sum(test) # basically zero
+# test <- as.double(test)
+# plot(test)
+
+clrDenMatrix_1 <- clr(denMatrix_1)
+clrDenMatrix_2 <- clr(denMatrix_2)
+```
+
+
+```{r echo=TRUE}
+# create a list with all variables for functional analysis  
+star <- list(classDen_gk = clrDenMatrix_1, 
+             classDen_gk_sc = clrDenMatrix_2,
+             evPoints = eqdist,
+             ClassType = listObjClasstype,
+             School = listObjSchool) 
+```
 
 ## Plot all class-specific densities
 
@@ -265,9 +290,6 @@ It seems strange that the data becomes less clear after we control for school-fi
 # Next Step: Repeat first Line of argument with groups for each School and color for four components (that i smost relevent for **school-specific-densities**)
 .
 
-# Next Step: Transform densities into clr coordinates
-
-Do we use a simple L2 space or Bayes Hilbert space??
 
 # Next Step: Find optimal bandwidth trough calculating "unbiased cross validation" for each group
 
@@ -303,6 +325,8 @@ mod1 <- FDboost(classDen_gk ~ 1 + bolsc(ClassType, df = 4),
 
 # plot(mod1)
 ```
+
+Result after clr transformation seems to be much more stable and results for Aid and Regular are basically identical here. Main effect is now that SMALL classes reduce the density of [0,0.35] percentiles.
 
 Model 1b: Classtype for school specific densities
 ```{r echo=TRUE}
@@ -347,6 +371,8 @@ mod2b <- FDboost(classDen_gk_sc ~ 1 +  bolsc(School, df = 4) + bolsc(ClassType, 
 # That is our model with regression lines for each school AND each Classtype
 
 ```
+
+Why do schools show an effect, when we implement school-specific densities??
 
 Again, same results with smaller coefficients
 
