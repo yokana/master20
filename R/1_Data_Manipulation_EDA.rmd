@@ -28,7 +28,7 @@ library(expss) # to assign var labels
 
 This document is aiming to provide a first insight into the dataset of the STAR project. The first part contains the necessary data manipulation, which can be skipped. The relevant code can be viewed by checking the `Code` snippets. The second part contains some basic explanatory analysis and regression models, which mostly follow those from Krüger et al. (1999 and 2001).
 
-**COMMENT**: In comparision to version 1 the computation of average scores was changed::
+**COMMENT**: In comparision to version 1 the computation of average scores was changed:
 
 1. Percentiles were calculated withing schools to control for fixed school effects (and because random assignment was done on school level)
 2. Instead of taking the average of the percentile ranks from the subject specific ranks, the average test score for each grade was calculated and after that percentile ranks were assigned.
