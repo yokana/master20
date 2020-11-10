@@ -1,0 +1,153 @@
+---
+title: "Analysis class performance as a collection of densities"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+  toc: yes
+code_folding: hide
+---
+  
+  ```{r chunk_setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
+                      eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
+                      fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+```{r echo=FALSE}
+library(tidyverse)
+library(kdensity) # density estimation
+library(lattice) # for histograms with relative frequencies
+library(FDboost) # for functional analysis
+```
+
+
+
+```{r echo=TRUE}
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/main_data.RData")    
+```
+
+
+Model for School ID 205490 (with only 3 classes) and 63 observations.
+
+```{r echo=TRUE}
+main_data <- main_data %>% filter(gkschid==205490)
+
+```
+
+
+# Kernel Estimation
+
+We use the apporach with beta-biased-kernels and user supplied bandwidth of `0.05` on overall percentiles for all students.
+
+```{r echo=TRUE}
+# split the data by class and then calculate a density for each class
+
+# we want to filter the dataset for each class
+# we sort the List by Teacher ID to get vectors in the right order
+classList <- sort(unique(main_data$gktchid))
+# make a list to store all densities
+densities <- vector("list", length = length(classList)-1)
+
+for (i in 1:length(classList)){
+  temp <- main_data %>% 
+    select(gktchid, perc_av_gk) %>% 
+    filter(gktchid==classList[i])
+  densities[[i]] <- kdensity(temp$perc_av_gk, start = "gumbel", kernel = "beta_biased", na.rm = T, bw = 0.08)}
+```
+
+Add covariates:
+  
+```{r echo=TRUE}
+# create a list of classtypes as factor with 1=SMALL, 2=AID
+listObjClasstype <- main_data %>% 
+  # automatically orders tibble by gktchid to correspond to order in classList
+  group_by(gktchid, gkclasstype) %>% 
+  summarise(.groups = "drop") %>% 
+  select(gkclasstype) %>%
+  filter(!is.na(gkclasstype)) %>%
+  unlist(use.names = F) %>%
+  factor(labels=c("SMALL", "Regular", "wAid"))
+
+# create a list of school IDs
+listObjSchool <- main_data %>% 
+  # automatically orders tibble by gktchid to correspond to order in classList
+  group_by(gktchid, gkschid) %>% 
+  summarise(.groups = "drop") %>% 
+  select(gkschid) %>%
+  filter(!is.na(gkschid)) %>%
+  unlist(use.names = F) 
+
+# comp_data_gender <- 
+#   comp_data_gk %>% group_by(gktchid, gender) %>% 
+#     summarise(n = n(), .groups="drop_last" ) %>% 
+#       mutate(share_gender = n / sum(n)) %>% 
+#         pivot_wider(id_cols =gktchid, names_from=gender, values_from= share_gender)
+```
+
+Transform Densities into **Design Matrix** 
+  
+```{r echo=TRUE}
+numPoints = 100
+# make a matrix where each row is a density and each column is an evaluation point
+denMatrix <- matrix(data = NA, nrow = length(densities), ncol = numPoints)
+eqdist <- seq(0,1,length.out = numPoints)  
+
+for (i in 1:length(densities)){
+  denMatrix[i,] <- densities[[i]](eqdist)
+}  
+
+
+# create a list with all variables for functional analysis  
+star <- list(classDen_gk = denMatrix, 
+             evPoints = eqdist,
+             ClassType = listObjClasstype,
+             School = listObjSchool) 
+
+
+
+```
+
+
+## Plot all class-specific densities
+
+```{r echo=TRUE}
+# par(mfrow = c(41,8), mar = c(2,2,2,2))
+# for (i in 1:length(densities)){
+#   plot(densities[[i]])
+# }
+
+## In one plot?
+plot(densities[[1]], ylim = c(0,4.5))
+for (i in 2:length(densities)){
+  lines(densities[[i]])
+} 
+
+
+```
+
+## Model with Classtype 
+
+```{r echo=TRUE}
+# Model with factor covariate region
+mod_sc <- FDboost(classDen_gk ~ 1 + bolsc(ClassType, df = 4),
+               timeformula = ~ bbs(evPoints),
+               offset = "scalar", data = star)
+
+plot(mod_sc)
+# That is our model with regression lines for each school AND each Classtype
+```
+
+
+This result is very different from our model, where we included all schools, but fixed effects??
+
+How is the effect on average?
+
+```{r echo=TRUE}
+  
+main_data %>% group_by(gkclasstype) %>%
+  summarize(mean = mean(perc_av_gk, na.rm = T))
+
+```
+
+Small class does much better in this school (due to lower **density** of bad students)
