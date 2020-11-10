@@ -1,0 +1,376 @@
+---
+title: "Analysis class performance as a collection of densities"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+  toc: yes
+code_folding: hide
+---
+  
+  ```{r chunk_setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
+                      eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
+                      fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+```{r echo=FALSE}
+library(tidyverse)
+library(kdensity) # density estimation
+library(lattice) # for histograms with relative frequencies
+library(FDboost) # for functional analysis
+```
+
+
+
+```{r echo=TRUE}
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/main_data.RData")    
+```
+
+
+# Kernel Estimation
+
+We use the approach with beta-biased-kernels and user supplied bandwidth of `0.05` on overall percentiles for all students.
+
+```{r echo=TRUE}
+# split the data by class and then calculate a density for each class
+
+# we want to filter the dataset for each class
+# we sort the List by Teacher ID to get vectors in the right order
+classList <- sort(unique(main_data$gktchid))
+# make a list to store all densities
+densities <- vector("list", length = length(classList))
+# ignore first value of List since it is NA
+for (i in 1:length(classList)){
+  temp <- main_data %>% 
+    select(gktchid, perc_av_gk) %>% 
+    filter(gktchid==classList[i])
+  densities[[i]] <- kdensity(temp$perc_av_gk, start = "gumbel", kernel = "beta_biased", na.rm = T, bw = 0.08)}
+```
+
+School-specific densities
+
+```{r echo=TRUE}
+# split the data by class and then calculate a density for each class
+
+# we want to filter the dataset for each class
+classList <- sort(unique(main_data$gktchid))
+# make a list to store all densities
+densities_sc <- vector("list", length = length(classList))
+# ignore first value of List since it is NA
+for (i in 1:length(classList)){
+  temp <- main_data %>% 
+    select(gktchid, perc_av_gk_sc) %>% 
+    filter(gktchid==classList[i])
+    densities_sc[[i]] <- kdensity(temp$perc_av_gk, start = "gumbel", kernel = "beta_biased", na.rm = T, bw = 0.08)}
+```
+
+Add covariates:
+
+```{r echo=TRUE}
+# create a list of classtypes as factor with 1=SMALL, 2=AID
+listObjClasstype <- main_data %>% 
+  # automatically orders tibble by gktchid to correspond to order in classList
+  group_by(gktchid, gkclasstype) %>% 
+  summarise(.groups = "drop") %>% 
+  select(gkclasstype) %>%
+  filter(!is.na(gkclasstype)) %>%
+  unlist(use.names = F) %>%
+  factor(labels=c("SMALL", "Regular", "wAid"))
+  
+# create a list of school IDs
+listObjSchool <- main_data %>% 
+  # automatically orders tibble by gktchid to correspond to order in classList
+  group_by(gktchid, gkschid) %>% 
+  summarise(.groups = "drop") %>% 
+  select(gkschid) %>%
+  filter(!is.na(gkschid)) %>%
+  unlist(use.names = F) 
+
+# comp_data_gender <- 
+#   comp_data_gk %>% group_by(gktchid, gender) %>% 
+#     summarise(n = n(), .groups="drop_last" ) %>% 
+#       mutate(share_gender = n / sum(n)) %>% 
+#         pivot_wider(id_cols =gktchid, names_from=gender, values_from= share_gender)
+```
+
+Transform Densities into **Design Matrix** 
+
+```{r echo=TRUE}
+numPoints = 100
+# make a matrix where each row is a density and each column is an evaluation point
+denMatrix_1 <- matrix(data = NA, nrow = length(densities), ncol = numPoints)
+# for school specific densities
+denMatrix_2 <- matrix(data = NA, nrow = length(densities_sc), ncol = numPoints)
+
+eqdist <- seq(0,1,length.out = numPoints)  
+
+for (i in 1:length(densities)){
+  denMatrix_1[i,] <- densities[[i]](eqdist)
+  denMatrix_2[i,] <- densities_sc[[i]](eqdist)
+}  
+
+
+# create a list with all variables for functional analysis  
+star <- list(classDen_gk = denMatrix_1, 
+             classDen_gk_sc = denMatrix_2,
+             evPoints = eqdist,
+             ClassType = listObjClasstype,
+             School = listObjSchool) 
+
+
+
+```
+
+
+## Plot all class-specific densities
+
+```{r echo=TRUE}
+# par(mfrow = c(41,8), mar = c(2,2,2,2))
+# for (i in 1:length(densities)){
+#   plot(densities[[i]])
+# }
+
+## In one plot?
+plot(densities[[1]], ylim = c(0,4.5))
+for (i in 2:length(densities)){
+  lines(densities[[i]])
+} 
+
+
+```
+
+It seems we have quite a lot of "extreme" classes with either a very skewed distribution to the left or to the right (more so to the left it seems)
+
+## Reproducing Histogram Representation (Eva)
+
+We show histogram for percentiles given Grade and Class Size:
+
+```{r echo=TRUE}
+smallClassesGK <- main_data %>% 
+  select(perc_av_gk, gkclasstype) %>% 
+  filter(gkclasstype=="SMALL CLASS" & !is.na(perc_av_gk)) 
+regClassesGK <- main_data %>% 
+  select(perc_av_gk, gkclasstype) %>% 
+  filter(gkclasstype=="REGULAR CLASS" & !is.na(perc_av_gk)) 
+regAidClassesGK <- main_data %>% 
+  select(perc_av_gk, gkclasstype) %>% 
+  filter(gkclasstype=="REGULAR + AIDE CLASS" & !is.na(perc_av_gk)) 
+```
+
+### Plot Histogramms for groups
+
+```{r echo=TRUE}
+par(mfrow = c(1,3))
+h1 <- hist(smallClassesGK$perc_av_gk, plot=F, breaks = 20)
+h1$counts <- h1$counts / sum(h1$counts)
+plot(h1, freq=TRUE, ylab="Relative Frequency", ylim = c(0,0.2))
+h2 <- hist(regClassesGK$perc_av_gk, plot = F, breaks = 20)
+h2$counts <- h2$counts / sum(h2$counts)
+plot(h2, freq=TRUE, ylab="Relative Frequency", ylim = c(0,0.2))
+h3 <- hist(regAidClassesGK$perc_av_gk, plot = F, breaks = 20)
+h3$counts <- h3$counts / sum(h3$counts)
+plot(h3, freq=TRUE, ylab="Relative Frequency", ylim = c(0,0.2))
+
+```
+
+We can see that small Classes decrease the densities of percentiles betwen 0 and 0.8 (homogenous effect) and increase their desnities for percentiles higher than 0.8.
+
+A small effect seems to be that Aids decrease the number of students in the lowest percentile and therefore slightly increasing the densities of percentiles between 0.1 and 0.5. **This might be a relevant effect, which needs clearification**.
+
+### Show group specific densities (later: with different grades in color)
+
+```{r echo=TRUE}
+# we want to filter the dataset for each class
+groupList <- unique(main_data$gkclasstype)
+# make a list to store all densities
+SizeTypedensities <- vector("list", length = length(groupList)-1)
+# ignore first value of List since it is NA
+for (i in 2:length(groupList)){
+  temp <- main_data %>% 
+    select(gkclasstype, perc_av_gk) %>% 
+    filter(gkclasstype==groupList[i])
+  SizeTypedensities[[i-1]] <- kdensity(temp$perc_av_gk, start = "gumbel", kernel = "beta_biased", na.rm = T, bw = 0.05)}  
+
+
+par(mfrow = c(1,3))
+plot(SizeTypedensities[[1]], ylim = c(0,1.4), main = "with Aid")
+plot(SizeTypedensities[[2]], ylim = c(0,1.4), main = "Small Classes")
+plot(SizeTypedensities[[3]], ylim = c(0,1.4), main = "Regular Classes")
+
+```
+
+As we can see, densities are are more pronounced in representing the effects mentioned before.
+
+Results are strongly depending on the choice of bandwidth
+
+## Reproducing Histogram using school-specific class densities
+
+
+
+### Plot Histogramms for groups
+
+We show histogram for percentiles given Grade and Class Size:
+
+```{r echo=TRUE}
+smallClassesGK <- main_data %>% 
+  select(perc_av_gk_sc, gkclasstype) %>% 
+  filter(gkclasstype=="SMALL CLASS" & !is.na(perc_av_gk_sc)) 
+regClassesGK <- main_data %>% 
+  select(perc_av_gk_sc, gkclasstype) %>% 
+  filter(gkclasstype=="REGULAR CLASS" & !is.na(perc_av_gk_sc)) 
+regAidClassesGK <- main_data %>% 
+  select(perc_av_gk_sc, gkclasstype) %>% 
+  filter(gkclasstype=="REGULAR + AIDE CLASS" & !is.na(perc_av_gk_sc)) 
+```
+
+
+
+```{r echo=TRUE}
+par(mfrow = c(1,3))
+h1 <- hist(smallClassesGK$perc_av_gk_sc, plot=F, breaks = 20)
+h1$counts <- h1$counts / sum(h1$counts)
+plot(h1, freq=TRUE, ylab="Relative Frequency", ylim = c(0,0.2))
+h2 <- hist(regClassesGK$perc_av_gk_sc, plot = F, breaks = 20)
+h2$counts <- h2$counts / sum(h2$counts)
+plot(h2, freq=TRUE, ylab="Relative Frequency", ylim = c(0,0.2))
+h3 <- hist(regAidClassesGK$perc_av_gk_sc, plot = F, breaks = 20)
+h3$counts <- h3$counts / sum(h3$counts)
+plot(h3, freq=TRUE, ylab="Relative Frequency", ylim = c(0,0.2))
+
+```
+
+After controlling for school effects, the small Class effect is stronger, while the Aid effect is weaker.
+
+### Show group specific densities (later: with different grades in color)
+
+```{r echo=TRUE}
+# make a list to store all densities
+SizeTypeDensities_sc <- vector("list", length = length(groupList)-1)
+# ignore first value of List since it is NA
+for (i in 2:length(groupList)){
+  temp <- main_data %>% 
+    select(gkclasstype, perc_av_gk_sc) %>% 
+    filter(gkclasstype==groupList[i])
+  SizeTypeDensities_sc[[i-1]] <- kdensity(temp$perc_av_gk_sc, start = "gumbel", kernel = "beta_biased", na.rm = T, bw = 0.3)}  
+par(mfrow = c(1,3))
+plot(SizeTypeDensities_sc[[1]], ylim = c(0,1.4), main = "with Aid")
+plot(SizeTypeDensities_sc[[2]], ylim = c(0,1.4), main = "Small Classes")
+plot(SizeTypeDensities_sc[[3]], ylim = c(0,1.4), main = "Regular Classes")
+
+```
+
+It seems strange that the data becomes less clear after we control for school-fixed effects (maybe problematic that we first compute percentiles on a school level and afterward looking for effects on a more general level?)
+
+# Next Step: Repeat first Line of argument with groups for each School and color for four components (that i smost relevent for **school-specific-densities**)
+.
+
+# Next Step: Transform densities into clr coordinates
+
+Do we use a simple L2 space or Bayes Hilbert space??
+
+# Next Step: Find optimal bandwidth trough calculating "unbiased cross validation" for each group
+
+use: https://bookdown.org/egarpor/NP-UC3M/kde-i-bwd.html
+
+
+# Regression Model
+
+
+
+### Intercept Model
+
+```{r echo=TRUE}
+# Intercept Model with standard defaults 
+m0 <- FDboost(classDen_gk ~ 1,
+              timeformula = ~ bbs(evPoints),
+              offset = "scalar", data = star)
+# Error in bsplines(mf[[i]], knots = args$knots[[i]]$knots, boundary.knots = args$knots[[i]]$boundary.knots,  : 
+#  some ‘x’ values are beyond ‘boundary.knots’
+# plot(m0)  
+```
+
+
+## Model1 with Covariates
+
+Model 1: Only Classtype
+
+```{r echo=TRUE}
+# Model with factor covariate region
+mod1 <- FDboost(classDen_gk ~ 1 + bolsc(ClassType, df = 4),
+               timeformula = ~ bbs(evPoints),
+               offset = "scalar", data = star)
+
+# plot(mod1)
+```
+
+Model 1b: Classtype for school specific densities
+```{r echo=TRUE}
+# Model with factor covariate region
+mod1b <- FDboost(classDen_gk_sc ~ 1 + bolsc(ClassType, df = 4),
+               timeformula = ~ bbs(evPoints),
+               offset = "scalar", data = star)
+
+# plot(mod1b)
+```
+
+This validates our OLS results in the sense that only SMALL class matters. 
+
+
+Model 2:
+
+with Classtype and School Effects
+
+```{r echo=TRUE}
+# Model with factor covariate region
+mod2 <- FDboost(classDen_gk ~ 1 +  bolsc(School, df = 4) + bolsc(ClassType, df = 4),
+               timeformula = ~ bbs(evPoints),
+               offset = "scalar", data = star)
+
+# plot(mod2)
+# That is our model with regression lines for each school AND each Classtype
+
+```
+
+**COMMENT**: Why is there no difference in the coefficients for Classtype when we include random effects for schools?? 
+- actually there is: the effects are much smaller in size (around |0.3| vs |0.15|) -> cp. to regression model where coefficients dont change -> here relative influence doesn't change
+- OLS Model gives coefficient between 0.05 and 0.1 on average
+
+
+```{r echo=TRUE}
+# Model with factor covariate region
+mod2b <- FDboost(classDen_gk_sc ~ 1 +  bolsc(School, df = 4) + bolsc(ClassType, df = 4),
+               timeformula = ~ bbs(evPoints),
+               offset = "scalar", data = star)
+
+# plot(mod2b)
+# That is our model with regression lines for each school AND each Classtype
+
+```
+
+Again, same results with smaller coefficients
+
+## Model for selected schools
+
+First, can we identify the school with biggest share of "bad" students?
+
+```{r echo=TRUE}
+test <- main_data %>% group_by(gkschid) %>%
+  summarise(mean_perc = mean(perc_av_gk, na.rm = T)) %>%
+  arrange(mean_perc)
+# School ID 205490 is a massive underperformer
+```
+
+Model for School ID 205490
+
+
+
+
+Actually interesting that we see one pressumbly **Outlier** school here (blue). Why dont we see coefficient for Classtype?
+
+## Comments
+
+Theoretically densities should represent the relative frequencies of observations in the related group, i.e. Small Class in school x.
+
+
+First results imply that the improvement of students skils on average is due to a strong effect in the **top quintile** of the class percentile distribution (within schools). I.e. strong students get better on average than bad students that are less bad. 
