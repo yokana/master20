@@ -1,0 +1,250 @@
+---
+title: "Analysis class performance as a collection of densities"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
+---
+  
+  ```{r chunk_setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
+                      eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
+                      fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+```{r echo=FALSE}
+library(tidyverse)
+library(kdensity) # density estimation
+library(FDboost) # for functional data analysis
+```
+
+```{r echo=TRUE}
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/main_data.RData")    
+```
+
+
+In a *density-on-regression" framework...
+
+- calculate densities for each class by class size etc.
+- each class consists of student_percentiles € [0,1], which sum up to one when integrated over the whole range..
+- the observed percentiles are theoretically generated as a density over all students (alt. within each school)
+
+
+# Calculate Densities
+
+We calculate the percentiles for all students and then calculate goup-specific densities for 
+- each class
+- school, classsize
+
+1. Array of Data
+- [1:classNumber], [0:1] percentiles within each class
+- [1:classNumber] vector of classsize
+- [1:classNumber] vector of schoolID <-> alt. change response densities
+
+See theoretic model from Eva!
+Variables Eva: share of woman labour income s; with estimated **densities** f:[0,1] -> R; s -> f(s) for different groups of observations
+-> Goal is to analyze the variation between those groups
+Variables STAR: student percentiles p (within schools); with estimated densities per class, f:[0,1] -> R; p -> f(p)
+`perc_av_gk`
+
+```{r echo=TRUE}
+summary(main_data$perc_av_gk)
+# how many classes (in kindergarten?)
+length(unique(main_data$gktchid))
+# 326
+```
+That is, we need to calculate 326 for the simplest model (ignoring grades).
+
+**Measurable Space**: ([0,1], B) with lambda on [0,1]
+
+**Kernel Estimation**: Eva uses `kdensity` (See Eva, p. 29)
+
+```{r echo=TRUE}
+
+# for check let's compute the density of all percentiles, which should be uniform
+kde = kdensity(main_data$perc_av_gk, start = "gumbel", kernel = "gaussian", na.rm = T)
+plot(kde)
+# Thats correct, we need to restrict the dpmain though
+# density check
+integrate(function(x) kde(x), lower = -Inf, upper = Inf)$value 
+# Ok
+
+# what happens if we take school-specific densities?
+kdeS = kdensity(main_data$perc_av_gk_sc, start = "gumbel", kernel = "gaussian", na.rm = T)
+plot(kdeS)
+# by the way bandwidth seems to be to big
+# higher share of very good students implies that there is the effect that we have quite a lot of students, who are very good relatively in their school but wouldn't be overall and since we have an overrepresentation of them there share is more visable
+```
+We should implement a beta kernel instead of a gaussian to account for all positive values.
+
+
+```{r echo=TRUE}
+# split the data by class and then calculate a density for each class
+
+# we want to filter the dataset for each class
+classList <- unique(main_data$gktchid)
+# make a list to store all densities
+densities <- vector("list", length = length(classList)-1)
+# ignore first value of List since it is NA
+for (i in 2:length(classList)){
+  temp <- main_data %>% 
+    select(gktchid, perc_av_gk) %>% 
+    filter(gktchid==classList[i])
+   densities[[i-1]] <- kdensity(temp$perc_av_gk, start = "gumbel", kernel = "gaussian", na.rm = T)}
+```
+
+Next, we calculate equidistant values from the densities:
+
+```{r echo=TRUE}
+numPoints = 100
+# make a matrix where each row is a density and each column is an evaluation point
+denMatrix <- matrix(data = NA, nrow = length(densities), ncol = numPoints)
+eqdist <- seq(0,1,length.out = numPoints)  
+
+for (i in 1:length(densities)){
+  denMatrix[i,] <- densities[[i]](eqdist)
+}
+```
+
+To transfer the densities into a **Bayesian Hilbert Space**, we need to clr transform them. That is the clr image of the calculated densities with respect to lambda on [0,1]. In our model we minimize the **sum of squared clr transformed residuals**.
+
+```{r echo=TRUE}
+# we need vectors of covariates for each class as well
+# have in mind to center continious variables to get interpretablöe results
+
+
+```
+
+```{r echo=TRUE}
+# create a list with all variables for functional analysis  
+star <- list(classDen_gk = denMatrix, evPoints = eqdist) 
+```
+
+
+
+We have functions, but for Model estimation we need equidistant values, therefore we decide to get 100 of them between 0 and 1.
+
+
+# Calculate density-on-scalar regression
+
+
+
+## Intercept Model
+
+This simply estimates the *mean curve* for the functional response over *s* for a mean regression (see FDboost, 24,26).
+Result depends on the definition of the offset (`offset_control`). This has mainly consequences for smoothness of the curve depending on the number of splines.
+
+$\mathbb{E}\left(Y_{\mathrm{EMG}}(t)\right)=\beta_{0}(t)$
+
+The *mean curve* should follow a uniform distribution??
+
+In the code a linear effect in t is implemented by `bols(t)`. For a linear effect of a scalar we use the Kornecker product of two marginal bases (as linear effects): `bols(z) %=% bols(t)` with z being the covariate and t evaluation point.
+- for smooth effects by *P-splines* use `bbs()` -> *B-spline representation for the design matrix (FDboost. 25)
+- all formulars are subsummarized under "additive predictors" within an "array framework"
+
+- constraints for the additive model is set to zero (FDbooost, 26)
+  + Interpretation: effects variation over t is interpreted as deviation form the smooth intercept and intercept is "global mean"
+  
+### Application
+
+Class densities vary over [0,1]
+
+```{r echo=TRUE}
+# Intercept Model with standard defaults 
+m0 <- FDboost(classDen_gk ~ 1,
+              timeformula = ~ bbs(evPoints),
+              offset = "scalar", data = star)
+# Error in bsplines(mf[[i]], knots = args$knots[[i]]$knots, boundary.knots = args$knots[[i]]$boundary.knots,  : 
+#  some ‘x’ values are beyond ‘boundary.knots’
+plot(m0)
+```
+
+
+
+
+## Density on one scalar (here factor)
+
+We want to seperate the effects into two marginal parts (see Brockhaus 2016, 98)
+  - marginal effect for respond density depending on t
+  - marginal effect for covariate depnding on J additive effects
+  - either Kornecker Product or row tensor product is used to combine both effects
+  - we construct a penality matrix (what happens if we dont?)
+  - loss function is calculated by "equally weighted" numerical integration `numInt = "equal"`
+  - smooth "offset" is calculated prior to the computation. `offset = "scalar"` corresponds to a global offset over all t
+  
+
+$\mathbb{E}\left(Y_{\mathrm{class}}(s) \mid \boldsymbol{x}\right)=\beta_{0}(s)+\sum_{k=1}^{??} I\left(x_{\text {school }}=k\right) \beta_{\text {school }, k}(s)+x_{\text {classsize }} \beta_{\text {classsize }}(s)$
+
+To keep it easy, we first compute classsize as -1 for standard and 1 for small classes to achive zero constraint (vgl. FDboost, 27).
+
+- all base learners need the same number of degrees of freedom (why?)
+- "with `df=2` for school -> school is estimated with a ridge penalty similar to a random effect (???), whereas the classsize effect is unpenalized (df=1)
+
+## Going beyond the mean
+
+Minimizing the squared error is assimilated with mean regression ("best approximation"). Alternatives are found in quantile regression set ups.
+
+- absolute error function: median regression (**might be relevant for STAR**)
+
+- we can use quintile Regression (implemented in FDboost) to regress on certain quantiles of the functional response.
+  + here the smooth intercept is the estimated quantile and smooth coefficient effects are deviations from the quantile
+- not available for functional response?? -> reporduce example on page 35
+
+# Theoretical background
+
+## Bayes Hilbert
+
+## Linear array model
+
+## Basic functional regression model
+
+$Y(s)$ is (one-dimensional functional representation in $L²$; the (conditional) expectation $E[Y(s)]$ is a curve and the covariance function is a surface: 
+Variance s2(t) =1n−1∑(xi(t)− ̄x(t)^ 2
+Covariance: C(s,t) =1/n−1 ∑(xi(s)− ̄x(s))(xi(t)− ̄x(t))
+
+We model the conditional mean of a functional response.
+
+In general models differ in:
+- basis expension (FPC, splines, non-parametric kernels)
+- regularization
+- fitting methods (Mixed Models framework vs. Bayesian framework vs. componen-wise gradient Boosting)
+
+
+
+## Basis representation of functional data
+
+"this projects the (functional) data into the space spanned by the basic functions (Brockhaus 2016, 2).
+Choices are: FPCs of functional data, (penalized) splines, wavelets, Fourier bases
+(Vergleiche: Vector ist eine lineare Kombination der euklidischen Basisvektoren)
+
+## Boosting
+
+Originally developed as a black box machine learning algorithm, with the intension to develop a *strong* learner from an ensemble of *weak* learners trough iteration and combination (Brockhaus 6). For our purpose, we use simple (penalized) regression models as weak learners and "optimum is searched along the steepest gradient descent".
+Procedure iteratively fits the negative gradient (i.e. the -2*(x-mean_x) for squared loss) of the loss to each base-learner and updates the best-fitting base-learner in each step (i.e. the coefficient that minimizes the loss function most)(Brockhaus 2016,6). This implies variable selection, which is not relevant in our case. 
+
+
+### Base learners
+
+### Degrees of freedom for base learners
+
+### Penalties
+
+### B-splines and knots
+
+### Quantile Regression (and Expectile)
+
+
+### Minimizing different loss functions
+
+For functional response we always compute the loss function pointwise and integrate over the domain of the response (FDboost, 35).
+
+Minimizing the mean squared loss is equivalent to maximizing the log-likelihood of the normal distribition. Thats why the default family for FDboost is Gaussian (FDboost, 34). -> **Proof**
+
+
+# Other stuff
+
+- find depth-median function (see Brockhaus, 3)
+- FANOVA for model with only factor variables (Brockhaus, 4)
+- modeling "within-curve correlation"
