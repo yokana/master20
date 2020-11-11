@@ -17,7 +17,6 @@ knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F,
 ```{r echo=FALSE}
 library(tidyverse)
 library(kdensity) # density estimation
-library(lattice) # for histograms with relative frequencies
 library(FDboost) # for functional analysis
 library(compositions) # for clr transformation
 ```
@@ -26,22 +25,178 @@ library(compositions) # for clr transformation
 
 ## Prerequisites 
 
+1. Load the dataset from chapter 1
+
+```{r echo=TRUE}
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/main_data.RData")    
+main_data <- main_data %>% select(perc_av_gk, perc_av_gk_sc, gkclasstype, gkschid, gktchid)
+```
+
+2. Comments
+
+At this point we concentrate the analysis on student percentiles for average scores in kindergarten, with the following variables of interest:
+- 5764 observations of students scores: `perc_av_gk`
+- 320 `classes`
+- 79 `schools`
+- 3 `classtypes` with levels *SMALL*, *REG* and *wAid*
+
+
 ## Density estimation
+
+The first step is built on the theoretical assumptions that the observed student score percentiles are realizations of an underlying conditional density function. We want to estimate a density function for each **group of interest**. For the most simple model at kindergarten level this would be $79*3=237$ densities.
+
+In addition, there are several parameters for kernel estimation that we need to tune carefully (see `?kdensity`):
+
+- optimal bandwidth: so far user supplied
+- parametric start: "gumbel"
+- kernel: "beta_biased" as the recommended bias-corrected kernel for use on unit interval
+
+Estimation:
+
+```{r echo=TRUE}
+# split the data by school*classtype
+# create a variable which combines both levels
+main_data <- main_data %>% filter(!is.na(perc_av_gk)) %>% 
+  mutate(school_by_type = interaction(gkschid,gkclasstype, sep=".", lex.order = T))
+
+# create a vector of unique identifiers for each density sorted by school ID
+# attributes(main_data$school_by_type) # factor with 237 levels
+vecIdent <- sort(unique(main_data$school_by_type))
+
+# make a list to store all densities (overall and school specific)
+# we want to use school-specific densities for visualization, since they are removing variation between schools, which we are not interested in
+densities <- vector("list", length = length(vecIdent))
+densities_sc <- vector("list", length = length(vecIdent))
+# ignore first value of List since it is NA
+for (i in 1:length(vecIdent)){
+  temp <- main_data %>% 
+    select(school_by_type, perc_av_gk, perc_av_gk_sc) %>% 
+    filter(school_by_type==vecIdent[i])
+  densities[[i]] <- kdensity(temp$perc_av_gk, start = "gumbel", kernel = "beta_biased", bw = 0.15)
+  densities_sc[[i]] <- kdensity(temp$perc_av_gk, start = "gumbel", kernel = "beta_biased", bw = 0.15)
+  }  
+```
+
+To get a rough idea of the data, we plot the estimated densities by `classtype`:
+
+```{r echo=TRUE}
+## we can use a vector of classtypes for coloring the corresponding plot
+colVec <- factor(str_sub(vecIdent, start = 8))
+plot(densities_sc[[1]], ylim = c(0,6), col = colVec[1])
+legend("topright", legend=c("SMALL", "REG", "wAID"), pch=16,col=unique(colVec))
+for (i in 2:length(densities)){
+  lines(densities[[i]], col=colVec[i])
+}
+```
+
+At this point, we are not able to identify a clear picture.
+
+## Covariates
 
 
 Following a first density-on-scalar estimation for the STAR data is represented.
 So far the model only accounts for (well known) effects of assigned classtypes amd only analyses students in kindergarten.
 
 We use data that consists of a list of
-- the densities (kernel estimation from chapter 3) for the percentiles for average score results for students in kindergarten
+- the densities (kernel estimation from chapter 3) for the percentiles for average score results for students in kindergarten evaluated at 100 equidistant points
 - a vector of evaluation points that were used to retrieve observation points for the densities
 - a vector of classtypes with levels: "SMALL", "Reg", "wAid"
 - a dummy vector indicating the assignment of a SMALL class
 - a vector of school specific indicators with 79 levels
 
+
+Create Covariates:
+
 ```{r echo=TRUE}
-load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/functionalData.RData")    
+# create a list of classtypes as factor with 1=SMALL, 2=AID, 3=wAid for all densities
+listObjClasstype <- main_data %>% 
+  # automatically orders tibble by schoolID and clastype to correspond to order in classList
+  group_by(gkschid, gkclasstype) %>% 
+  summarise(.groups = "drop") %>% 
+  select(gkclasstype) %>%
+  filter(!is.na(gkclasstype)) %>%
+  unlist(use.names = F) %>%
+  factor(labels=c("SMALL", "Regular", "wAid"))
+
+# create an addition Dummy Vector for classtype SMALL
+dummyClasstype <- recode(listObjClasstype, "SMALL" = 1, "Regular" = 0, "wAid" = 0)
+  
+# create a list of school IDs for all estimated densities
+listObjSchool <- main_data %>% 
+  # automatically orders tibble by gktchid to correspond to order in classList
+  group_by(gkschid, gkclasstype) %>% 
+  summarise(.groups = "drop") %>% 
+  select(gkschid) %>%
+  filter(!is.na(gkschid)) %>%
+  unlist(use.names = F) 
+
+# comp_data_gender <- 
+#   comp_data_gk %>% group_by(gktchid, gender) %>% 
+#     summarise(n = n(), .groups="drop_last" ) %>% 
+#       mutate(share_gender = n / sum(n)) %>% 
+#         pivot_wider(id_cols =gktchid, names_from=gender, values_from= share_gender)
+
 ```
+
+Get densities values at 100 equidistant evaluation points:
+
+```{r echo=TRUE}
+numPoints = 100
+# make a matrix where each row is a density and each column is an evaluation point
+denMatrix_1 <- matrix(data = NA, nrow = length(densities), ncol = numPoints)
+# for school specific densities
+denMatrix_2 <- matrix(data = NA, nrow = length(densities_sc), ncol = numPoints)
+
+eqdist <- seq(0.001,0.999,length.out = numPoints)  
+
+for (i in 1:length(densities)){
+  denMatrix_1[i,] <- densities[[i]](eqdist)
+  denMatrix_2[i,] <- densities_sc[[i]](eqdist)
+}  
+
+```
+
+## Clr Transformation
+
+Theoretically we must transform our densities, which are elements of an **Bayes Hilbert Space** into **L2** (See Eva Maria Maier, p.14) to be able to perform function-on-scalar regression: 
+$$
+\operatorname{clr}_{\lambda}\left[f_{\mu}\right]:=\log f_{\mu}-\frac{1}{\lambda(\mathcal{T})} \cdot \int_{\mathcal{T}} \log f_{\mu} \mathrm{d} \lambda
+$$
+
+Since we evaluate the densities along a vector of equidistant points this transformation corresponds to the clr-transformation of compositional variables (See Boogart et al. 2013, p.41):
+$$
+\operatorname{clr}(\mathbf{x})=\left(\ln \frac{x_{i}}{g(\mathbf{x})}\right)_{i=1, \ldots, D} \quad \text { with } \quad g(\mathbf{x})=\sqrt[D]{x_{1} \cdot x_{2} \cdots x_{D}}
+$$
+With $D$ being the number of equidistant evaluation points. Since we want to avoid taking logarithms of value zero, we choose our equidistant points from the closed interval $[0.001,0.999]$.
+
+We can easily transform the vector of evaluation points by the `clr` command from Boogarts et al. `composition` R add on package. 
+
+
+```{r echo=TRUE}
+clrDenMatrix_1 <- clr(denMatrix_1)
+clrDenMatrix_2 <- clr(denMatrix_2)
+# after clr transformation the vector of values sums up to zero
+```
+
+## Data Object for Regression
+
+We combine the dependent vectors and the covariates into a list object
+
+```{r echo=TRUE}
+# create a list with all variables for functional analysis  
+star <- list(classDen_gk = clrDenMatrix_1, 
+             classDen_gk_sc = clrDenMatrix_2,
+             evPoints = eqdist,
+             densityID = vecIdent,
+             ClassType = listObjClasstype,
+             ClassDummy = dummyClasstype,
+             School = listObjSchool) 
+
+# save list as it is the core data for further analysis
+setwd("~/Documents/Projects/2020_Master_STAR/master20/data")
+save(star, file = "functionalData.RData")
+```  
+
 
 ## Representation of clr-transformed densities
 
@@ -50,15 +205,16 @@ At first, we can plot all class-specific densities into one plot and for specifi
 
 ```{r echo=TRUE}
 # get the densities
-depDens <- star$classDen_gk
+depDens <- star$classDen_gk_sc
 evPoints <- star$evPoints
-plot(evPoints,as.double(depDens[1,]), type="l", ylim = c(-800,100))
+plot(evPoints,as.double(depDens[1,]), type="l", ylim = c(-80,80), col = colVec[1])
+legend("bottomright", legend=c("SMALL", "REG", "wAID"), pch=16,col=unique(colVec))
 for (i in 2:nrow(depDens)){
-  lines(evPoints,as.double(depDens[i,]), type="l", ylim = c(-800,100))
+  lines(evPoints,as.double(depDens[i,]), type="l", col=colVec[i])
 }   
 ```
 
-There are a few "extreme" classes with an extreme underrepresentation of students with very low percentiles. We can avoid this by calculating school-specific densities.
+There are a few "extreme" classes with an extreme underrepresentation of students with very low percentiles and those are SMALL classes. We expect them to influence the regression model quite a lot. We can also see that the clr-transformation seems to represent the relational structure of the data much better then the original densities as seen above. 
 
 ```{r echo=TRUE}
 # get the densities
