@@ -134,6 +134,7 @@ This section follows the theoretical outline from [Boogart et al. 2013, p. 41ff]
 # test <- as.double(test)
 # plot(test)
 
+# another advantage of clr trasnformation is that the functional data is automatically centered and therefore easier to interpret
 clrDenMatrix_1 <- clr(denMatrix_1)
 clrDenMatrix_2 <- clr(denMatrix_2)
 ```
@@ -144,8 +145,13 @@ clrDenMatrix_2 <- clr(denMatrix_2)
 star <- list(classDen_gk = clrDenMatrix_1, 
              classDen_gk_sc = clrDenMatrix_2,
              evPoints = eqdist,
+             classID = classList,
              ClassType = listObjClasstype,
              School = listObjSchool) 
+
+# save list as it is the core data for further analysis
+setwd("~/Documents/Projects/2020_Master_STAR/master20/data")
+save(star, file = "functionalData.RData")
 ```
 
 ## Plot all class-specific densities
@@ -319,6 +325,8 @@ Model 1: Only Classtype
 
 ```{r echo=TRUE}
 # Model with factor covariate region
+# bolsc models linear effect
+# bbsc models smooth effect
 mod1 <- FDboost(classDen_gk ~ 1 + bolsc(ClassType, df = 4),
                timeformula = ~ bbs(evPoints),
                offset = "scalar", data = star)
@@ -375,6 +383,25 @@ mod2b <- FDboost(classDen_gk_sc ~ 1 +  bolsc(School, df = 4) + bolsc(ClassType, 
 Why do schools show an effect, when we implement school-specific densities??
 
 Again, same results with smaller coefficients
+
+
+## Model 3 with interaction effects between classtype and school
+
+given:
+
+y ~ 1 + bolsc(school) + bolsc(classtype) + bols(school) %Xc% bols(classtype)
+
+```{r echo=TRUE}
+# Model with factor covariate region
+mod3 <- FDboost(classDen_gk_sc ~ 1 +  bolsc(School, df = 4) + bolsc(ClassType, df = 4) + bols(School, df = 4) %Xc% bols(ClassType, df = 4),
+               timeformula = ~ bbs(evPoints),
+               offset = "scalar", data = star)
+
+# plot(mod3)
+# That is our model with regression lines for each school AND each Classtype
+
+```
+
 
 ## Model for selected schools
 
