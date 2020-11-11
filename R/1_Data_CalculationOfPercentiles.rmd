@@ -1,0 +1,924 @@
+---
+title: "Percentile Calculation"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, include=FALSE}
+library(tidyverse)
+library(doBy)
+library(broom)
+library("data.table")
+library(magrittr) 
+library(gtools) # various programming tools
+library("robCompositions") # for compData analysis
+library(compositions)
+library(ggplot2) # for plots
+library(gridExtra) # for several plots in one window
+library(expss) # to assign var labels
+```
+
+This document is aiming to provide a first insight into the dataset of the STAR project. The first part contains the necessary data manipulation, which can be skipped. The relevant code can be viewed by checking the `Code` snippets. The second part contains some basic explanatory analysis and regression models, which mostly follow those from Krüger et al. (1999 and 2001).
+
+**COMMENT**: In comparision to version 1 and 2 percentiles were calculated without a reference group. 
+
+```{r echo=TRUE}
+# rename our dataset  
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/STAR_Students.RData")
+# rename and drop observation with only NAs
+main_data <- x %>% filter(!is.na(stdntid))
+# Compute Raw average Scores as a new Variable of Interest
+main_data <- 
+  main_data %>% mutate(gkaversc = (gktmathss + gktreadss + gkwordskillss)/3, g1aversc = (g1tmathss + g1treadss + g1wordskillss)/3, g2aversc = (g2tmathss + g2treadss + g2wordskillss)/3, g3aversc = (g3tmathss + g3treadss + g3wordskillss)/3)
+
+```
+
+# Data Manipulation
+
+### Percentile Ranks
+
+One main question is how to compute the dependent variable `percentile ranks`. Following I repeat the computing steps that Krüger lays out in his paper from 1999. Brief explanations can be found inside the code.
+
+Percentage ranks are first computed for all students in regular classes and then the students, who were assigned to small classes, are given their ranks relative to the ranks of the distribution of regular students. Test scores are available for math, reading and word comprehension. Following the mean values for each group of students and each subject are displayed. For computation the `percent_rank()` function from the `dplyr` package was used. The function gives the lower percentile rank to students with equal score, which probably explains why the mean values for regular students (baseline) are lower than 0.5.
+
+**COMMENT**: In this version, I computed percentiles for average test results differently from Krügers suggestion. Instead of calculating the rank of a students as the average of his or her subject specific ranks, the average of the subject-specific test scores was computed and then each (regular) got assigned to his or her school specific rank. This preserves a uniform distribution for regular students within schools. 
+
+Mean Scores for students in regular classes in Kindergarten: 
+
+
+```{r echo=TRUE}
+# Calculate Percentiles
+main_data <- 
+  main_data %>% mutate(perc_maths_gk=percent_rank(gktmathss), perc_read_gk =percent_rank(gktreadss), perc_word_gk=percent_rank(gkwordskillss), perc_av_gk=percent_rank(gkaversc))
+
+
+scores_gk <- reg_scores_gk
+
+for (i in 1:nrow(small_scores_gk)) {
+  # select ith observation
+  obs <- small_scores_gk[i,]
+  # add to regular observations and compute percentile ranks
+  temp <- add_row(reg_scores_gk, obs) %>% 
+    mutate(perc_maths_gk=percent_rank(gktmathss), perc_read_gk =percent_rank(gktreadss), perc_word_gk=percent_rank(gkwordskillss), perc_av_gk=percent_rank(gkaversc))
+  # add observation to merged scores
+  scores_gk <-  add_row(scores_gk, tail(temp,1))
+}
+
+
+# Calculate Summary Statistics (See: Krüger (1999), p. 508)
+scores_gk %>% 
+  filter(gkclasstype=="REGULAR CLASS" | gkclasstype=="REGULAR + AIDE CLASS") %>%
+    summarise(mean_av = mean(perc_av_gk), mean_math = mean(perc_maths_gk), mean_read = mean(perc_read_gk), mean_word = mean(perc_word_gk))
+
+# We can already see that SMALL classes seem to have a positive impact on average (interestingly biggest effect on reading abilities (kind of makes sense))
+```
+Mean Scores for students in small classes in Kindergarten: 
+
+```{r echo=TRUE}
+scores_gk %>% 
+  filter(gkclasstype=="SMALL CLASS") %>%
+    summarise(mean_av = mean(perc_av_gk), mean_math = mean(perc_maths_gk), mean_read = mean(perc_read_gk), mean_word = mean(perc_word_gk))    
+```
+
+The results for kindergarten students already show a positive effect of *SMALL* classes.
+
+The computation is repeated for 1st, 2nd and 3rd Grade.
+
+Mean Scores for students in regular classes in Grade 1: 
+
+```{r echo=TRUE}
+reg_scores_g1 <- 
+  main_data_g1 %>% filter(g1classtype=="REGULAR CLASS" | g1classtype=="REGULAR + AIDE CLASS", !is.na(g1tmathss) & !is.na(g1treadss) & !is.na(g1wordskillss) )  %>%
+    select(stdntid,g1classtype,g1tmathss,g1treadss, g1wordskillss, g1schid, g1aversc)
+
+small_scores_g1 <- 
+  main_data_g1 %>% filter(g1classtype=="SMALL CLASS", !is.na(g1tmathss) & !is.na(g1treadss) & !is.na(g1wordskillss) )  %>%
+    select(stdntid,g1classtype,g1tmathss,g1treadss, g1wordskillss, g1schid, g1aversc)
+
+reg_scores_g1 <- 
+  reg_scores_g1 %>% mutate(perc_maths_g1=percent_rank(g1tmathss), perc_read_g1 =percent_rank(g1treadss), perc_word_g1=percent_rank(g1wordskillss), perc_av_g1=percent_rank(g1aversc))
+
+scores_g1 <- reg_scores_g1
+
+for (i in 1:nrow(small_scores_g1)) {
+  # select ith observation
+  obs <- small_scores_g1[i,]
+  # add to regular observations and compute percentile ranks
+  temp <- add_row(reg_scores_g1, obs) %>% 
+    mutate(perc_maths_g1=percent_rank(g1tmathss), perc_read_g1 =percent_rank(g1treadss), perc_word_g1=percent_rank(g1wordskillss), perc_av_g1=percent_rank(g1aversc))
+  # add observation to merged scores
+  scores_g1 <-  add_row(scores_g1, tail(temp,1))
+}
+
+scores_g1 %>% 
+  filter(g1classtype=="REGULAR CLASS" | g1classtype=="REGULAR + AIDE CLASS") %>%
+    summarise(mean_av = mean(perc_av_g1), mean_math = mean(perc_maths_g1), mean_read = mean(perc_read_g1), mean_word = mean(perc_word_g1))
+
+```
+Mean Scores for students in small classes in Grade 1: 
+
+```{r echo=TRUE}
+scores_g1 %>% 
+  filter(g1classtype=="SMALL CLASS") %>%
+    summarise(mean_av = mean(perc_av_g1), mean_math = mean(perc_maths_g1), mean_read = mean(perc_read_g1), mean_word = mean(perc_word_g1))    
+```
+
+Mean Scores for students in regular classes in Grade 2: 
+
+```{r echo=TRUE}
+reg_scores_g2 <- 
+  main_data_g2 %>% filter(g2classtype=="REGULAR CLASS" | g2classtype=="REGULAR + AIDE CLASS", !is.na(g2tmathss) & !is.na(g2treadss) & !is.na(g2wordskillss) )  %>%
+    select(stdntid,g2classtype,g2tmathss,g2treadss, g2wordskillss, g2schid, g2aversc )
+
+small_scores_g2 <- 
+  main_data_g2 %>% filter(g2classtype=="SMALL CLASS", !is.na(g2tmathss) & !is.na(g2treadss) & !is.na(g2wordskillss) )  %>%
+    select(stdntid,g2classtype,g2tmathss,g2treadss, g2wordskillss, g2schid, g2aversc)
+
+reg_scores_g2 <- 
+  reg_scores_g2 %>% mutate(perc_maths_g2=percent_rank(g2tmathss), perc_read_g2 =percent_rank(g2treadss), perc_word_g2=percent_rank(g2wordskillss), perc_av_g2=percent_rank(g2aversc))
+
+scores_g2 <- reg_scores_g2
+
+for (i in 1:nrow(small_scores_g2)) {
+  # select ith observation
+  obs <- small_scores_g2[i,]
+  # add to regular observations and compute percentile ranks
+  temp <- add_row(reg_scores_g2, obs) %>% 
+    mutate(perc_maths_g2=percent_rank(g2tmathss), perc_read_g2 =percent_rank(g2treadss), perc_word_g2=percent_rank(g2wordskillss))
+  # add observation to merged scores
+  scores_g2 <-  add_row(scores_g2, tail(temp,1))
+}
+
+
+scores_g2 %>% 
+  filter(g2classtype=="REGULAR CLASS" | g2classtype=="REGULAR + AIDE CLASS") %>%
+    summarise(mean_av = mean(perc_av_g2), mean_math = mean(perc_maths_g2), mean_read = mean(perc_read_g2), mean_word = mean(perc_word_g2))
+
+```
+
+Mean Scores for students in small classes in Grade 2:
+
+```{r echo=TRUE}
+scores_g2 %>% 
+  filter(g2classtype=="SMALL CLASS") %>%
+    summarise(mean_av = mean(perc_av_g2), mean_math = mean(perc_maths_g2), mean_read = mean(perc_read_g2), mean_word = mean(perc_word_g2))
+# word has more below 0.5 means (many equal scores?)    
+```
+
+Mean Scores for students in regular classes in Grade 3:
+
+
+```{r echo=TRUE}
+reg_scores_g3 <- 
+  main_data_g3 %>% filter(g3classtype=="REGULAR CLASS" | g3classtype=="REGULAR + AIDE CLASS", !is.na(g3tmathss) & !is.na(g3treadss) & !is.na(g3wordskillss) )  %>%
+    select(stdntid,g3classtype,g3tmathss,g3treadss, g3wordskillss, g3schid,g3aversc  )
+
+small_scores_g3 <- 
+  main_data_g3 %>% filter(g3classtype=="SMALL CLASS", !is.na(g3tmathss) & !is.na(g3treadss) & !is.na(g3wordskillss) )  %>%
+    select(stdntid, g3classtype,g3tmathss,g3treadss, g3wordskillss, g3schid,g3aversc  )
+
+reg_scores_g3 <- 
+  reg_scores_g3 %>% mutate(perc_maths_g3=percent_rank(g3tmathss), perc_read_g3 =percent_rank(g3treadss), perc_word_g3=percent_rank(g3wordskillss),  perc_av_g3=percent_rank(g3aversc))
+
+scores_g3 <- reg_scores_g3
+
+for (i in 1:nrow(small_scores_g3)) {
+  # select ith observation
+  obs <- small_scores_g3[i,]
+  # add to regular observations and compute percentile ranks
+  temp <- add_row(reg_scores_g3, obs) %>% 
+    mutate(perc_maths_g3=percent_rank(g3tmathss), perc_read_g3 =percent_rank(g3treadss), perc_word_g3=percent_rank(g3wordskillss),  perc_av_g3=percent_rank(g3aversc))
+  # add observation to merged scores
+  scores_g3 <-  add_row(scores_g3, tail(temp,1))
+}
+
+scores_g3 %>% 
+  filter(g3classtype=="REGULAR CLASS" | g3classtype=="REGULAR + AIDE CLASS") %>%
+    summarise(mean_av = mean(perc_av_g3), mean_math = mean(perc_maths_g3), mean_read = mean(perc_read_g3), mean_word = mean(perc_word_g3))
+
+```
+Mean Scores for students in small classes in Grade 3:
+
+```{r echo=TRUE}
+scores_g3 %>% 
+  filter(g3classtype=="SMALL CLASS") %>%
+    summarise(mean_av = mean(perc_av_g3), mean_math = mean(perc_maths_g3), mean_read = mean(perc_read_g3), mean_word = mean(perc_word_g3))    
+```
+
+Merge all results by student ID:
+
+```{r echo=TRUE}
+scores_all <- 
+  scores_gk %>% 
+    full_join(scores_g1, by = "stdntid") %>% 
+      full_join(scores_g2, by = "stdntid") %>% 
+        full_join(scores_g3, by = "stdntid") %>% 
+          select(stdntid, perc_av_g3, perc_maths_g3, perc_read_g3, perc_word_g3, perc_av_g2, perc_maths_g2, perc_read_g2, perc_word_g2, perc_av_g1, perc_maths_g1, perc_read_g1, perc_word_g1,perc_av_gk, perc_maths_gk, perc_read_gk, perc_word_gk)
+# we get a problem here, because covariates are in different categories, better make a dataset with new variables and merge them with the main_data
+main_data <- 
+  main_data %>% full_join(scores_all, by="stdntid")
+```
+
+### Percentile Ranks per School
+
+This approach diverges from Krüger et al., but might be helpful for **compositional Analysis**.
+
+```{r echo=TRUE}
+
+small_scores_gk_sc <- 
+  main_data_gk %>% filter(gkclasstype=="SMALL CLASS", !is.na(gktmathss) & !is.na(gktreadss) & !is.na(gkwordskillss) )  %>%
+    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid, gkaversc  )
+
+
+# We simply repeat the procedure with data grouped by school 
+reg_scores_gk_sc <- 
+  reg_scores_gk %>%
+    group_by(gkschid) %>% 
+      mutate(perc_maths_gk_sc=percent_rank(gktmathss), perc_read_gk_sc =percent_rank(gktreadss), perc_word_gk_sc=percent_rank(gkwordskillss), perc_av_gk_sc=percent_rank(gkaversc)) %>%
+        ungroup()
+
+scores_gk_sc <- reg_scores_gk_sc
+
+for (i in 1:nrow(small_scores_gk_sc)) {
+  # select ith observation
+  obs <- small_scores_gk_sc[i,]
+  # add to regular observations and compute percentile ranks
+  temp <- add_row(reg_scores_gk_sc, obs) %>%
+    group_by(gkschid) %>%
+    mutate(perc_maths_gk_sc=percent_rank(gktmathss), perc_read_gk_sc =percent_rank(gktreadss), perc_word_gk_sc=percent_rank(gkwordskillss), perc_av_gk_sc=percent_rank(gkaversc)) %>% ungroup()
+  # add observation to merged scores
+  scores_gk_sc <-  add_row(scores_gk_sc, tail(temp,1))
+}
+
+# Grade 1
+small_scores_g1_sc <- 
+  main_data_g1 %>% filter(g1classtype=="SMALL CLASS", !is.na(g1tmathss) & !is.na(g1treadss) & !is.na(g1wordskillss) )  %>%
+    select(stdntid,g1classtype,g1tmathss,g1treadss, g1wordskillss, g1schid, g1aversc)
+
+reg_scores_g1_sc <- 
+  reg_scores_g1 %>%
+    group_by(g1schid) %>% 
+      mutate(perc_maths_g1_sc=percent_rank(g1tmathss), perc_read_g1_sc =percent_rank(g1treadss), perc_word_g1_sc=percent_rank(g1wordskillss), perc_av_g1_sc=percent_rank(g1aversc))  %>%
+        ungroup()
+
+scores_g1_sc <- reg_scores_g1_sc
+
+for (i in 1:nrow(small_scores_g1_sc)) {
+  # select ith observation
+  obs <- small_scores_g1_sc[i,]
+  # add to regular observations and compute percentile ranks
+  temp <- add_row(reg_scores_g1_sc, obs) %>%
+    group_by(g1schid) %>%
+    mutate(perc_maths_g1_sc=percent_rank(g1tmathss), perc_read_g1_sc =percent_rank(g1treadss), perc_word_g1_sc=percent_rank(g1wordskillss), perc_av_g1_sc=percent_rank(g1aversc))  %>%
+        ungroup()
+  # add observation to merged scores
+  scores_g1_sc <-  add_row(scores_g1_sc, tail(temp,1))
+}
+
+# Grade 2
+small_scores_g2_sc <- 
+  main_data_g2 %>% filter(g2classtype=="SMALL CLASS", !is.na(g2tmathss) & !is.na(g2treadss) & !is.na(g2wordskillss) )  %>%
+    select(stdntid,g2classtype,g2tmathss,g2treadss, g2wordskillss, g2schid, g2aversc  )
+
+reg_scores_g2_sc <- 
+  reg_scores_g2 %>%
+    group_by(g2schid) %>% 
+      mutate(perc_maths_g2_sc=percent_rank(g2tmathss), perc_read_g2_sc =percent_rank(g2treadss), perc_word_g2_sc=percent_rank(g2wordskillss), perc_av_g2_sc=percent_rank(g2aversc))  %>%
+        ungroup()
+
+scores_g2_sc <- reg_scores_g2_sc
+
+for (i in 1:nrow(small_scores_g2_sc)) {
+  # select ith observation
+  obs <- small_scores_g2_sc[i,]
+  # add to regular observations and compute percentile ranks
+  temp <- add_row(reg_scores_g2_sc, obs) %>%
+    group_by(g2schid) %>%
+    mutate(perc_maths_g2_sc=percent_rank(g2tmathss), perc_read_g2_sc =percent_rank(g2treadss), perc_word_g2_sc=percent_rank(g2wordskillss), perc_av_g2_sc=percent_rank(g2aversc))  %>%
+        ungroup()
+  # add observation to merged scores
+  scores_g2_sc <-  add_row(scores_g2_sc, tail(temp,1))
+}
+
+
+# Grade 3
+small_scores_g3_sc <- 
+  main_data_g3 %>% filter(g3classtype=="SMALL CLASS", !is.na(g3tmathss) & !is.na(g3treadss) & !is.na(g3wordskillss) )  %>%
+    select(stdntid,g3classtype,g3tmathss,g3treadss, g3wordskillss, g3schid , g3aversc )
+
+reg_scores_g3_sc <- 
+  reg_scores_g3 %>%
+    group_by(g3schid) %>% 
+      mutate(perc_maths_g3_sc=percent_rank(g3tmathss), perc_read_g3_sc =percent_rank(g3treadss), perc_word_g3_sc=percent_rank(g3wordskillss), perc_av_g3_sc=percent_rank(g3aversc))  %>%
+        ungroup()
+
+scores_g3_sc <- reg_scores_g3_sc
+
+for (i in 1:nrow(small_scores_g3_sc)) {
+  # select ith observation
+  obs <- small_scores_g3_sc[i,]
+  # add to regular observations and compute percentile ranks
+  temp <- add_row(reg_scores_g3_sc, obs) %>%
+    group_by(g3schid) %>%
+    mutate(perc_maths_g3_sc=percent_rank(g3tmathss), perc_read_g3_sc =percent_rank(g3treadss), perc_word_g3_sc=percent_rank(g3wordskillss), perc_av_g3_sc=percent_rank(g3aversc))  %>%
+        ungroup()
+  # add observation to merged scores
+  scores_g3_sc <-  add_row(scores_g3_sc, tail(temp,1))
+}
+
+
+scores_all_sc <- 
+  scores_gk_sc %>% 
+    full_join(scores_g1_sc, by = "stdntid") %>% 
+      full_join(scores_g2_sc, by = "stdntid") %>% 
+        full_join(scores_g3_sc, by = "stdntid") %>% 
+          select(stdntid, perc_av_g3_sc, perc_maths_g3_sc, perc_read_g3_sc, perc_word_g3_sc, perc_av_g2_sc, perc_maths_g2_sc, perc_read_g2_sc, perc_word_g2_sc, perc_av_g1_sc, perc_maths_g1_sc, perc_read_g1_sc, perc_word_g1_sc,perc_av_gk_sc, perc_maths_gk_sc, perc_read_gk_sc, perc_word_gk_sc)
+# we get a problem here, because covariates are in different categories, better make a dataset with new variables and merge them with the main_data
+main_data <- 
+  main_data %>% full_join(scores_all_sc, by="stdntid")
+```
+
+
+We expect percentile ranks for regular students within schools to follow a uniform distribution. The Variation in distribution of test scores from students in small classes is of interest.
+
+```{r echo=TRUE}
+# choose a school
+# unique(main_data$gkschid)
+school1 <- 
+  main_data %>% filter(gkschid==169229 & gkclasstype!="SMALL CLASS")
+hist(school1$perc_av_gk_sc)
+title("Distribution")
+```
+
+### Race into 3 factors: White/Asian, Black, Other
+
+At first, for students:
+
+```{r echo=TRUE}
+# Change the levels of var race
+main_data$race <-  recode_factor(main_data$race, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+summary(main_data$race)
+```
+
+Secondly, for teachers:
+
+```{r echo=TRUE}
+# Change the levels of var race for Teacher in Kindergarten
+main_data$gktrace <-  recode_factor(main_data$gktrace, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+
+# and for 1st,2nd and 3rd Grade
+main_data$g1trace <-  recode_factor(main_data$g1trace, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+main_data$g2trace <-  recode_factor(main_data$g2trace, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+main_data$g3trace <-  recode_factor(main_data$g3trace, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+
+# Give statistics for Kindergarten Teachers
+summary(main_data$gktrace)
+```
+
+
+
+### Compute Entry Levels
+
+Krüger controls for entry levels and schools, since random assignment took place within schools and there are several arguments that entry level has an effect on the strength of the treatment variable.
+
+```{r echo=TRUE}
+main_data <- 
+  main_data %>% 
+  mutate(entry_level = ifelse(X=="YES",1,0)) %>% 
+    mutate(entry_level = ifelse(X.1=="YES" & X=="NO",2,entry_level)) %>% 
+      mutate(entry_level = ifelse(X.2=="YES" & X=="NO" & X.1=="NO",3,entry_level))  %>% 
+        mutate(entry_level = ifelse(X.3=="YES" & X=="NO" & X.1=="NO" & X.2=="NO",4,entry_level)) 
+main_data$entry_level <- factor(main_data$entry_level, labels=c("Kindergarten", "1st Grade", "2nd Grade", "3rd Grade"))
+# create Fixed effects for school-by-entry-wave effects (see Krüger 2001)
+# 4 levels
+
+main_data <- 
+  main_data %>% mutate(school_at_entry = ifelse(entry_level=="Kindergarten", gkschid, 0)) %>%
+    mutate(school_at_entry = ifelse(entry_level=="1st Grade", g1schid, school_at_entry)) %>%
+      mutate(school_at_entry = ifelse(entry_level=="2nd Grade", g2schid, school_at_entry)) %>%
+        mutate(school_at_entry = ifelse(entry_level=="3rd Grade", g3schid, school_at_entry))
+main_data$school_at_entry <- factor(main_data$school_at_entry) 
+# attributes(main_data$school_at_entry)
+# 79 levels
+
+
+```
+
+Create Krügers school by entry fixed effects:
+
+```{r echo=TRUE}
+# make a factor variable, which combines the two informations to get an interaction effect
+# this is "school_by_entry_wave variable (see Krüger 1999)
+main_data$school_by_entry <- with(main_data, interaction(school_at_entry, entry_level))
+# attributes(main_data$school_by_entry)
+# 321 levels against 304 with Krüger
+# that should work out when we control for missings in the test scores    
+```
+
+### Recode Class type as a DUMMY:
+
+This is just done for easier computation of later regression models and else.
+
+We compute the actual classtype by entree wave:
+
+```{r echo=TRUE}
+main_data <- 
+  main_data %>% mutate(smallDu = ifelse(entry_level=="Kindergarten" & gkclasstype=="SMALL CLASS",1 , ifelse(entry_level=="1st Grade" & g1classtype=="SMALL CLASS",1, ifelse(entry_level=="2nd Grade" & g2classtype=="SMALL CLASS",1, ifelse(entry_level=="3rd Grade" & g3classtype=="SMALL CLASS",1,0)))))
+
+# main_data$smallDu <- factor(main_data$smallDu, labels = c("OTHER", "SMALL"))
+
+main_data <- 
+  main_data %>% mutate(regAidDu = ifelse(entry_level=="Kindergarten" & gkclasstype=="REGULAR + AIDE CLASS",1 , ifelse(entry_level=="1st Grade" & g1classtype=="REGULAR + AIDE CLASS",1, ifelse(entry_level=="2nd Grade" & g2classtype=="REGULAR + AIDE CLASS",1, ifelse(entry_level=="3rd Grade" & g3classtype=="REGULAR + AIDE CLASS",1,0)))))
+
+# main_data$regAidDu <- factor(main_data$regAidDu, labels = c("OTHER", "RegAid"))
+
+summary(main_data$smallDu); summary(main_data$regAidDu)
+```
+
+
+### Recode teacher education as Dummy
+
+Following Krüger, teacher education is recoded as a DUMMY for Master degree or higher. Summary Statistics are displayed for each grade (k-3):
+
+```{r echo=TRUE}
+# create a Dummy for Master or Higher
+main_data <- 
+  main_data %>% 
+    mutate(gktdegree = ifelse(gkthighdegree=="MASTERS" |gkthighdegree=="MASTER +" | gkthighdegree=="SPECIALIST" |gkthighdegree=="DOCTORAL",1,0), g1tdegree = ifelse(g1thighdegree=="MASTERS" |g1thighdegree=="MASTER +" | g1thighdegree=="SPECIALIST" |g1thighdegree=="DOCTORAL",1,0), g2tdegree = ifelse(g2thighdegree=="MASTERS" |g2thighdegree=="MASTER +" | g2thighdegree=="SPECIALIST" |g2thighdegree=="DOCTORAL",1,0), g3tdegree = ifelse(g3thighdegree=="MASTERS" |g3thighdegree=="MASTER +" | g3thighdegree=="SPECIALIST" |g3thighdegree=="DOCTORAL",1,0))
+
+summary(main_data$gktdegree); summary(main_data$g1tdegree); summary(main_data$g2tdegree); summary(main_data$g3tdegree)
+```
+
+### Recode School ID as factor variable
+
+```{r echo=TRUE}
+main_data$gkschid <- factor(main_data$gkschid)
+main_data$g1schid <- factor(main_data$g1schid)
+main_data$g2schid <- factor(main_data$g2schid)
+main_data$g3schid <- factor(main_data$g3schid)
+# attributes(main_data$gkschid)
+
+attributes(main_data$gkschid)
+```
+
+### Recode Free Lunch as a DUMMY
+
+This recodes the grade specific free lunch variables into one Dummy indicating overall `free lunch` status.
+
+```{r echo=TRUE}
+main_data <-  main_data %>% mutate(lunch = ifelse(entry_level=="Kindergarten" & gkfreelunch=="FREE LUNCH",1, ifelse(entry_level=="1st Grade" & g1freelunch=="FREE LUNCH",1, ifelse(entry_level=="2nd Grade" & g2freelunch=="FREE LUNCH", 1,ifelse(entry_level=="3rd Grade" & g3freelunch=="FREE LUNCH",1 , 0)))))   
+
+summary(main_data$lunch)
+```
+
+### Assign variable labels to new variables
+
+```{r echo=TRUE}
+# Average test scores
+attributes(main_data$gkaversc) <- list(comment = "Average test score in kindergarten")   
+attributes(main_data$g1aversc) <- list(comment = "Average test score in Grade1") 
+attributes(main_data$g2aversc) <- list(comment = "Average test score in Grade2") 
+attributes(main_data$g3aversc) <- list(comment = "Average test score in Grade3") 
+# percentiles of whole distribution
+attributes(main_data$perc_maths_gk) <- list(comment = "Percentile Math over all STAR students in kindergarten")   
+attributes(main_data$perc_maths_g1) <- list(comment = "Percentile Math over all STAR students in Grade1")   
+attributes(main_data$perc_maths_g2) <- list(comment = "Percentile Math over all STAR students in Grade2")   
+attributes(main_data$perc_maths_g3) <- list(comment = "Percentile Math over all STAR students in Grade3")   
+attributes(main_data$perc_read_gk) <- list(comment = "Percentile Reading over all STAR students in kindergarten")   
+attributes(main_data$perc_read_g1) <- list(comment = "Percentile Reading over all STAR students in Grade1")   
+attributes(main_data$perc_read_g2) <- list(comment = "Percentile Reading over all STAR students in Grade2")   
+attributes(main_data$perc_read_g3) <- list(comment = "Percentile Reading over all STAR students in Grade3")  
+attributes(main_data$perc_word_gk) <- list(comment = "Percentile Word comprehension over all STAR students in kindergarten")   
+attributes(main_data$perc_word_g1) <- list(comment = "Percentile Word comprehension over all STAR students in Grade1")   
+attributes(main_data$perc_word_g2) <- list(comment = "Percentile Word comprehension over all STAR students in Grade2")   
+attributes(main_data$perc_word_g3) <- list(comment = "Percentile Word comprehension over all STAR students in Grade3") 
+attributes(main_data$perc_av_gk) <- list(comment = "Percentile average score over all STAR students in kindergarten")   
+attributes(main_data$perc_av_g1) <- list(comment = "Percentile average score  over all STAR students in Grade1")   
+attributes(main_data$perc_av_g2) <- list(comment = "Percentile average score  over all STAR students in Grade2")   
+attributes(main_data$perc_av_g3) <- list(comment = "Percentile average score  over all STAR students in Grade3") 
+# percentiles within schools
+attributes(main_data$perc_maths_gk_sc) <- list(comment = "Percentile Math within schools in kindergarten")   
+attributes(main_data$perc_maths_g1_sc) <- list(comment = "Percentile Math within schools in Grade1")   
+attributes(main_data$perc_maths_g2_sc) <- list(comment = "Percentile Math within schools in Grade2")   
+attributes(main_data$perc_maths_g3_sc) <- list(comment = "Percentile Math within schools in Grade3")   
+attributes(main_data$perc_read_gk_sc) <- list(comment = "Percentile Reading within schools in kindergarten")   
+attributes(main_data$perc_read_g1_sc) <- list(comment = "Percentile Reading within schools in Grade1")   
+attributes(main_data$perc_read_g2_sc) <- list(comment = "Percentile Reading within schools in Grade2")   
+attributes(main_data$perc_read_g3_sc) <- list(comment = "Percentile Reading within schools in Grade3")  
+attributes(main_data$perc_word_gk_sc) <- list(comment = "Percentile Word comprehension within schools in kindergarten")   
+attributes(main_data$perc_word_g1_sc) <- list(comment = "Percentile Word comprehension within schools in Grade1")   
+attributes(main_data$perc_word_g2_sc) <- list(comment = "Percentile Word comprehension within schools in Grade2")   
+attributes(main_data$perc_word_g3_sc) <- list(comment = "Percentile Word comprehension within schools in Grade3") 
+attributes(main_data$perc_av_gk_sc) <- list(comment = "Percentile average score within schools in kindergarten")   
+attributes(main_data$perc_av_g1_sc) <- list(comment = "Percentile average score  within schools in Grade1")   
+attributes(main_data$perc_av_g2_sc) <- list(comment = "Percentile average score  within schools in Grade2")   
+attributes(main_data$perc_av_g3_sc) <- list(comment = "Percentile average score  within schools in Grade3") 
+# label race variable for students
+attributes(main_data$race) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Student race in 3 categories", class = c("ordered", "factor"))
+# label race variable for teachers by class
+attributes(main_data$gktrace) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Teacher race kindergarten in 3 categories", class = c("ordered", "factor"))
+attributes(main_data$g1trace) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Teacher race grade1 in 3 categories", class = c("ordered", "factor"))
+attributes(main_data$g2trace) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Teacher race grade2 in 3 categories", class = c("ordered", "factor"))
+attributes(main_data$g3trace) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Teacher race grade3 in 3 categories", class = c("ordered", "factor"))
+# label entry level
+attributes(main_data$entry_level) <- list(comment = "Indikator at which grade student entered STAR", levels=levels(main_data$entry_level), class=class(main_data$entry_level))
+# label school at entryy
+attributes(main_data$school_at_entry) <- list(comment = "Indikator which school student was attending when entering STAR", levels=levels(main_data$school_at_entry), class=class(main_data$school_at_entry))
+# label school by entree
+attributes(main_data$school_by_entry) <- list(comment = "Indikator for school and entry level student when entering STAR", levels=levels(main_data$school_by_entry), class=class(main_data$school_by_entry))
+# label class type dummies
+attributes(main_data$smallDu) <- list(comment = "Dummy for students who entered STAR in a small class")
+attributes(main_data$regAidDu) <- list(comment = "Dummy for students who entered STAR in a regular class with Aides")
+# label teacher education dummy_ Master or higehr for each grade
+attributes(main_data$gktdegree) <-  list(comment = "Dummy for teacher with Master degree or higher in kindergarten")
+attributes(main_data$g1tdegree) <-  list(comment = "Dummy for teacher with Master degree or higher in grade1")
+attributes(main_data$g2tdegree) <-  list(comment = "Dummy for teacher with Master degree or higher in grade2")
+attributes(main_data$g3tdegree) <-  list(comment = "Dummy for teacher with Master degree or higher in grade3")
+# label lunch dummy
+attributes(main_data$lunch) <-  list(comment = "Dummy for students with FREE LUNCH status when the joined STAR")
+#
+```
+
+
+
+
+
+Let's save the manipulated data sets for later access.
+
+```{r echo=TRUE}
+save(main_data, file = "/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/main_data_new.RData")    
+```
+
+
+
+
+# EDA
+
+### Population characteristics [Table 1, Krüger 2001]
+
+```{r echo=TRUE, message=FALSE}
+# get relatrive shares without NAs
+(minority <- main_data %>% group_by(race) %>% summarise(n = n()) %>% mutate(rel_freq=n/sum(n[1:4])))
+
+```
+
+**Comments**: Share of Black Students is 36.0% to 31.7% (Krüger 2001) and minorities other then Black are only `r round(sum(minority$rel_freq[3:6])*100,2)`% vs. 1.4%. 
+- Depends on Entry Levels on students (here all entry levels were used)
+
+```{r echo=TRUE, message=FALSE}
+# get relatrive shares without NAs
+(poverty <- main_data %>% group_by(gkfreelunch) %>% summarise(n = n()) %>% mutate(rel_freq=n/sum(n)))
+
+```
+**Comment**: It seems that Krüger interpreted NAs as *non- eligible for free-lunch*. Still his numbers are a bit lower with 24.4% to 26.3%. Ignoring the NAs results into a share of 48.4% students who are eligible for free-lunch (kindergarten level).
+
+```{r echo=TRUE, message=FALSE}
+# get relatrive shares without NAs
+teacher <- main_data %>% 
+   filter(g3tdegree!="NA") %>% 
+    group_by(g3tdegree) %>% summarise(n = n()) %>% mutate(rel_freq=n/sum(n[1:2]))
+teacher
+```
+
+**Comments**: Here Krüger seems to ignore NAs. Results are `r round(sum(teacher$rel_freq[2])*100,1)`% vs. 43.4%.
+
+```{r echo=TRUE, message=FALSE}
+
+(act_scores <- main_data %>% summarise(ACT_Math = mean(hsactmath,na.rm=TRUE)))
+```
+**Comment**: Krüger uses ACT Math Scores (instead of combined totals) and again sample results are slightly higher with Krüger indicating a sample with "smarter" students overall.
+
+
+It seems that the proportions of all data points are slightly different regarding the socio-economic background of students (i.d. more missings around "poor" students?). Does this introduce a relevant selection bias?
+
+### Density of Test Scores
+
+Plot of test scores in Kindergarten
+
+```{r echo=TRUE, warning=FALSE}
+# Histogram overlaid with kernel density curve
+g1 <- ggplot(main_data, aes(x=gkaversc)) + 
+    geom_histogram(aes(y=..density..),      # Histogram with density instead of count on y-axis
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666")  + # Overlay with transparent density plot
+    ggtitle("Average")
+g2 <- ggplot(main_data, aes(x=gktmathss)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666")  +
+      ggtitle("Math")
+g3 <- ggplot(main_data, aes(x=gkwordskillss)) + 
+    geom_histogram(aes(y=..density..),    
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666")  + 
+      ggtitle("Wordskills")
+g4 <- ggplot(main_data, aes(x=gktreadss)) + 
+    geom_histogram(aes(y=..density..),    
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666") +
+    ggtitle("Reading")
+  
+grid.arrange(g1, g2, g3, g4, nrow = 2)
+```
+
+Distributions are skewed to the left. 
+
+
+Plot of test scores in 3rd Grade
+
+```{r echo=TRUE}
+# Histogram overlaid with kernel density curve
+g5 <- ggplot(main_data, aes(x=g3aversc)) + 
+    geom_histogram(aes(y=..density..),      # Histogram with density instead of count on y-axis
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666")  + # Overlay with transparent density plot
+    ggtitle("Average")
+g6 <- ggplot(main_data, aes(x=g3tmathss)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666")  +
+      ggtitle("Math")
+g7 <- ggplot(main_data, aes(x=g3wordskillss)) + 
+    geom_histogram(aes(y=..density..),    
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666")  + 
+      ggtitle("Wordskills")
+g8 <- ggplot(main_data, aes(x=g3treadss)) + 
+    geom_histogram(aes(y=..density..),    
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666") +
+    ggtitle("Reading")
+  
+grid.arrange(g5, g6, g7, g8, nrow = 2)
+```
+
+Test scores are getting quite close to a normal distribution in 3rd Grade. 
+
+### Box plot: Average score by class 
+
+
+```{r echo=TRUE, warning=FALSE}
+p2 <- ggplot(data=subset(main_data, !is.na(gkclasstype)), aes(x = gkclasstype, y = perc_av_gk)) +
+        geom_boxplot(fill="#4271AE",alpha = 0.7,
+                     outlier.colour = "#1F3552", outlier.shape = 20, varwidth=T) +
+        scale_y_continuous(name = "Test Score Average SAT",
+                           breaks = seq(0, 1, 0.1),
+                           limits=c(0, 1)) +
+        scale_x_discrete(name = "Class Type") +
+        ggtitle("Box plot of average score by class type for Kindergarten students")
+p2    
+
+```
+
+### Figure 1: Distribution Test Scores (Krüger 1999, p.509)
+
+Plot Densities of average test results at each Grade
+
+```{r echo=TRUE}
+reg_scores_gk <- 
+  main_data_gk %>% filter(gkclasstype=="REGULAR CLASS" | gkclasstype=="REGULAR + AIDE CLASS", !is.na(gktmathss) & !is.na(gktreadss) & !is.na(gkwordskillss) ) %>%
+    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss )
+
+
+theme_set(theme_classic())
+# Plot
+g1 <- ggplot(data=subset(main_data, !is.na(perc_av_gk_sc)), aes(perc_av_gk_sc)) + 
+  geom_density(aes(fill=factor(smallDu)), alpha=0.8) +
+labs(title="Kindergarten",
+caption="Source: STAR",
+x="Average SAT Test Percentile Rank",
+fill="Class Type")
+
+
+g2 <- ggplot(data=subset(main_data, !is.na(perc_av_g1_sc)), aes(perc_av_g1_sc)) + 
+  geom_density(aes(fill=factor(smallDu)), alpha=0.8) +
+labs(title="1st Grade",
+caption="Source: STAR",
+x="Average SAT Test Percentile",
+fill="Class Type")
+
+g3 <- ggplot(data=subset(main_data, !is.na(perc_av_g2_sc)), aes(perc_av_g2_sc)) + 
+  geom_density(aes(fill=factor(smallDu)), alpha=0.8) +
+labs(title="2nd Grade",
+caption="Source: STAR",
+x="Average SAT Test Percentile",
+fill="Class Type")
+
+g4 <- ggplot(data=subset(main_data, !is.na(perc_av_g3_sc)), aes(perc_av_g3_sc)) + 
+  geom_density(aes(fill=factor(smallDu)), alpha=0.8) +
+labs(title="3nd Grade",
+caption="Source: STAR",
+x="Average SAT Test Percentile",
+fill="Class Type")
+
+
+grid.arrange(g1, g2, g3 , g4 , nrow = 2)
+
+```
+
+The figure is almost identical to Krüger's publication. Only the curve for regular students in 3rd grade seems missing a small peak around the 0.5 percentile.
+
+
+### Table 2: Randomization Tests (Krüger 2001,p.6)
+
+Test consist of a regression of the dependent variable `small class` onto several demographic characteristics. In contrary to Krüger the population only consists of kindergarten students and is therefore considerable smaller (6294 vs. 11.294):
+
+1. Basic Model without fixed effects:
+
+```{r echo=TRUE}
+# main_data <- main_data %>% mutate(Small_class = ifelse(gkclasstype=="SMALL CLASS",1,0))
+r_model1 <- lm(smallDu ~ race + gender + lunch, data = main_data) 
+(summary(r_model1))
+```
+
+Demographic variables effects are non-significant. *F-Statistic* suggests that none of the covariates has explanatory power for the assignment of `small` classes.
+
+2. Model which includes *school fixed effects* using schools id's at kindergarten (assignment) level
+
+```{r echo=TRUE}
+r_model2 <- lm(smallDu ~ race + gender + lunch + gkschid, data = main_data) 
+r_model2 %>% tidy()
+```
+
+3. Model with *Entry-Grade-fixed effects*
+
+```{r echo=TRUE}
+
+r_model3 <- lm(smallDu ~ race + gender + lunch + g3schid + entry_level, data = main_data) 
+r_model3 %>% tidy()
+```
+
+
+We still seem to have random assignments to class and level-entry cohorts, but level 4 seems to inherit a problem (students are more likely to be in a SMALL class, when assigned in 3rd grade?). Due to the entry effect, F-Statistic does **not** suggest random covariates any more.
+
+4. Model with *School-by-entry-wave* fixed effects:
+
+```{r echo=TRUE}
+
+r_model4 <- lm(smallDu ~ race + gender + gkfreelunch + gkschid + school_by_entry, data = main_data) 
+r_model4 %>% tidy()
+```
+
+5. Model with regression on to teachers characteristics in Grade 2:
+
+```{r echo=TRUE}
+# create a Dummy for Master or Higher
+main_data <- 
+  main_data %>% 
+    mutate(degree = ifelse(g1thighdegree=="MASTERS" |g1thighdegree=="MASTER +" | g1thighdegree=="SPECIALIST" |g1thighdegree=="DOCTORAL",1,0))  
+# r_model4 <- 
+#   lm(Small_class ~ g3tgen + degree, data = main_data) 
+# r_model5 <- 
+#   lm(Small_class ~ g2tgen + degree + gkschid + entry_level, data = main_data) 
+
+# (summary(r_model4))
+# (summary(r_model5))
+lm(smallDu ~ g2tgen + degree + gkschid, data = main_data) %>% tidy() 
+```
+
+**COMMENT**: Gender is not significant for teachers in grade 3, however in earlier stages it is suggesting that female teachers were less likely to be associated with small classes??
+
+### Basic Regression Model (Table 5, Krüger 1999, p. 512)
+
+See Krüger 1999, p. 510 for explanations:
+
+$$
+\text { (2) } \quad Y_{i c s}=\beta_{0}+\beta_{1} S M A L L_{c s}+\beta_{2} R E G / A_{c s}+\beta_{3} X_{i c s}+\alpha_{s}+\epsilon_{i c s}
+$$
+
+Following, the regression for kindergarten students are computed. In the following Models actual class type (not initial class type is used as treatment).
+
+Model 1:
+
+```{r echo=TRUE}
+r_mod1_99 <- 
+  lm(perc_av_gk ~ smallDu + regAidDu , data = main_data) 
+summary(r_mod1_99)    
+```
+
+
+Model 2:
+
+```{r echo=TRUE}
+r_mod2_99 <- 
+  lm(perc_av_gk ~ smallDu + regAidDu + gkschid, data = main_data) 
+r_mod2_99 %>% tidy()
+```
+
+The results are similar to Krüger, even though effects of an additional Aid seem higher but still insignificant at 5% level. After including *School fixed effects*, we get an R squared value of `r round(summary(r_mod2_99)$r.squared,3)`.
+
+Be aware, that we did not calculate robust standard errors so far.
+
+
+Model 4 (full model:
+
+```{r echo=TRUE}
+r_mod4_99_gk <-
+  lm(perc_av_gk ~ smallDu + regAidDu + race + gender + gkfreelunch  + gktrace  + gktyears + gktdegree + gkschid, data = main_data)
+# we remove teachers gender; apparently there are only female teachers in kindergarten
+r_mod4_99_gk %>% tidy()
+```
+
+For the full model, we get an R squared value of `r round(summary(r_mod4_99_gk)$r.squared,3)`, which is identical to Krüger. `Gender`, `Race` and `FREE LUNCH` are significant factors at the individual level. For Teachers `Master` Dummy is not relevant, but experience in years is.
+
+Sample Size for Krüger was 5861 for kindergarten, the estimated Model above contains 5615 observations, i.d. the coding strategy produces slightly more missings.
+
+We repeat the regression for students with test scores in Grade 3:
+
+```{r echo=FALSE}
+r_mod4_99_g3 <- 
+  lm(perc_av_g3 ~ smallDu + regAidDu + race + gender + g3freelunch  + g3trace + g3tgen  + g3tyears + g3tdegree + g3schid, data = main_data) 
+r_mod4_99_gk %>% tidy()
+```
+
+For the full model, we get an R squared value of `r round(summary(r_mod4_99_g3)$r.squared,3)`. Again results fit to Krügers estimation. 
+
+Sample Size for Krüger was 6109 for kindergarten, the estimated Model above contains 5641 observations, i.d. the coding strategy produces slightly more missings.
+
+### Figure 1: Small-Class Efect from Kindergarten to Grade 4 (Krüger 2001, p. 9)
+
+This is a reproduction of the left side of Krügers figure with effects for kindergarten level until grade 3 for the whole population, for `black` students and for `free lunch` students
+
+```{r echo=TRUE}
+# subsetting the data
+black <- main_data %>% filter(race=="BLACK")
+frLunch <- main_data %>% filter(lunch==1)
+
+# Compute regression models for each grade
+dep_vars <- c("perc_av_gk_sc", "perc_av_g1_sc", "perc_av_g2_sc", "perc_av_g3_sc")
+regresults <- lapply(dep_vars, function(dp){
+  mod <- lm(get(dp)~ smallDu + race + gender + lunch + school_by_entry, data=main_data)
+  coef(mod)[2]
+})
+regresults_bl <- lapply(dep_vars, function(dp){
+  mod <- lm(get(dp)~ smallDu + gender + lunch + school_at_entry, data=black)
+  coef(mod)[2]
+})
+regresults_lu <- lapply(dep_vars, function(dp){
+  mod <- lm(get(dp)~ smallDu + gender + race + school_at_entry, data=frLunch)
+  coef(mod)[2]
+})
+
+classes <- c("K","1","2","3")
+
+plot(seq(classes), regresults, type = "l", lty=1,  ylim = c(0,0.1), main = "Effects on Average Scores", ylab="Percentile changes", xlab="class",  xaxs="i" , axes=FALSE)
+lines(seq(classes), regresults_bl, lty=2, col ="blue")
+lines(seq(classes), regresults_lu, lty=3)
+abline(v=4.5, col="red")
+axis(side=1, labels=classes, at=seq(classes))
+axis(side = 2, at=seq(0,0.1,0.01), las=1)    
+```
+
+After calculating percentile ranks of average scores the result looks quite different from Krüger. Especially the effect in grade 2 looks suspicious. What is happening?
+
+```{r echo=TRUE}
+main_data %>% group_by(smallDu) %>% 
+  summarise(meang2 = mean(perc_av_g2_sc, na.rm = TRUE), meangk = mean(perc_av_gk_sc, na.rm = TRUE))  
+# that doesn't look like any difference in the center
+
+```
+
+
+## Mixed Model
+
+Apply a standard Model with random coefficients at school level:
+
+
+```{r echo=TRUE}
+library(lme4)
+
+
+lmeMod = lmer(perc_av_gk ~ smallDu + regAidDu +  (1|gkschid), data=main_data)
+
+summary(lmeMod)
+```
+
+Coefficients and Standard Error are very close to standard regression with school fixed effects. Intraclass coefficent is `r 0.01985/(0.01985+0.06496)`, i.e. 23% variation in kindergarden schools is explained on the school level.
+
+
+Let's check how much that explanatory power is related to the categorical school variable: gksurban
+
+```{r echo=TRUE}
+lmeMod2 = lmer(perc_av_gk ~ smallDu + regAidDu +  (1|gksurban), data=main_data)
+
+summary(lmeMod2)
+
+```
+
+Intraclacorrelation is reduced to 5.6%, i.e. differentiation between the school location is a poor replacement for school effects. This also implies that we don't really know, what drives the differences between schools, but can assume it is related to school-specific quality issues, which are more complex then the suburban/urban division. 

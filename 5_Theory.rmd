@@ -1,0 +1,22 @@
+---
+title: "Analysis class performance as a collection of densities"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
+---
+  
+```{r chunk_setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
+                      eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
+                      fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+In this file, the main theoretical arguments behind density-on-scalar regression are crudely summarized. 
+
+## clr transformation
+
+This is necessary to transform the estimated densities, which are elements of the *Bayes Hilbert Space* into the usual space for functional regression (space of square integrable functions). (See Maria Master Thesis)
+
