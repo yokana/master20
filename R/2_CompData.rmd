@@ -28,7 +28,7 @@ library(collapse) # for faster computation of sample statistics
 ```
 
 ```{r echo=TRUE}
-load("/home/hanes/Documents/Projects/2020_Master_STAR/master20/data/main_data.RData")    
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/main_data.RData")    
 ```
 
 Following, the STAR data set is recoded as a *composition*, where each *class* consists of several components. The steps of analysis are mostly a reproduction from the work of Boogart et al.(2013) and Filzmoser et al. (2019).
