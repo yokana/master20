@@ -29,7 +29,8 @@ library(compositions) # for clr transformation
 
 ```{r echo=TRUE}
 load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/main_data.RData")    
-main_data <- main_data %>% select(perc_av_gk, perc_av_gk_sc, gkclasstype, gkschid, gktchid)
+main_data <- main_data %>% select(perc_av_gk, perc_av_gk_sc, gkclasstype, gkschid, gktchid, lunch, race, gender) %>%
+  filter(!is.na(perc_av_gk))
 ```
 
 2. Comments
@@ -37,7 +38,7 @@ main_data <- main_data %>% select(perc_av_gk, perc_av_gk_sc, gkclasstype, gkschi
 At this point we concentrate the analysis on student percentiles for average scores in kindergarten, with the following variables of interest:
 
 - 5764 observations of students score percentiles: `perc_av_gk`
-- 320 `classes`
+- 325 `classes`
 - 79 `schools`
 - 3 `classtypes` with levels *SMALL*, *REG* and *wAid*
 
@@ -117,14 +118,9 @@ In addition, there are several parameters for kernel estimation that we need to 
 Estimation:
 
 ```{r echo=TRUE}
-# split the data by school*classtype
-# create a variable which combines both levels
-main_data <- main_data %>% filter(!is.na(perc_av_gk)) %>% 
-  mutate(school_by_type = interaction(gkschid,gkclasstype, sep=".", lex.order = T))
-
 # create a vector of unique identifiers for each density sorted by school ID
 # attributes(main_data$school_by_type) # factor with 237 levels
-vecIdent <- sort(unique(main_data$school_by_type))
+vecIdent <- sort(unique(main_data$gktchid))
 
 # make a list to store all densities (overall and school specific)
 # we want to use school-specific densities for visualization, since they are removing variation between schools, which we are not interested in
@@ -133,8 +129,8 @@ densities_sc <- vector("list", length = length(vecIdent))
 # ignore first value of List since it is NA
 for (i in 1:length(vecIdent)){
   temp <- main_data %>% 
-    select(school_by_type, perc_av_gk, perc_av_gk_sc) %>% 
-    filter(school_by_type==vecIdent[i])
+    select(gktchid, perc_av_gk, perc_av_gk_sc) %>% 
+    filter(gktchid==vecIdent[i])
   densities[[i]] <- kdensity(temp$perc_av_gk, start = "uniform", kernel = "beta_biased", bw = 0.1)
   densities_sc[[i]] <- kdensity(temp$perc_av_gk, start = "uniform", kernel = "beta_biased", bw = 0.1)
   }  
@@ -166,15 +162,18 @@ We use data that consists of a list of
 - a vector of classtypes with levels: "SMALL", "Reg", "wAid"
 - a dummy vector indicating the assignment of a SMALL class
 - a vector of school specific indicators with 79 levels
+- Share of Free-Lunch students
+- Share of female students
+- share of race groups (probably non-linear) -> smooth effects
 
 
-Create Covariates:
+Create Covariates for `classtype` and `school` factor:
 
 ```{r echo=TRUE}
 # create a list of classtypes as factor with 1=SMALL, 2=AID, 3=wAid for all densities
 listObjClasstype <- main_data %>% 
   # automatically orders tibble by schoolID and clastype to correspond to order in classList
-  group_by(gkschid, gkclasstype) %>% 
+  group_by(gktchid, gkclasstype) %>% 
   summarise(.groups = "drop") %>% 
   select(gkclasstype) %>%
   filter(!is.na(gkclasstype)) %>%
@@ -187,19 +186,55 @@ dummyClasstype <- recode(listObjClasstype, "SMALL" = 1, "Regular" = 0, "wAid" = 
 # create a list of school IDs for all estimated densities
 listObjSchool <- main_data %>% 
   # automatically orders tibble by gktchid to correspond to order in classList
-  group_by(gkschid, gkclasstype) %>% 
+  group_by(gktchid, gkschid) %>% 
   summarise(.groups = "drop") %>% 
   select(gkschid) %>%
   filter(!is.na(gkschid)) %>%
   unlist(use.names = F) 
+```
 
-# comp_data_gender <- 
-#   comp_data_gk %>% group_by(gktchid, gender) %>% 
-#     summarise(n = n(), .groups="drop_last" ) %>% 
-#       mutate(share_gender = n / sum(n)) %>% 
-#         pivot_wider(id_cols =gktchid, names_from=gender, values_from= share_gender)
+Get covariates: `gender`, `race` and `free lunch`
+
+```{r echo=TRUE}
+# collapse data into group shares by class (teacher ID)
+comp_data_gender <- 
+  main_data %>% group_by(gktchid, gender) %>% 
+    summarise(n = n(), .groups="drop_last" ) %>% 
+      mutate(share_gender = n / sum(n)) %>% 
+        pivot_wider(id_cols =gktchid, names_from=gender, values_from= share_gender) %>%
+          # we need to ungroup to get rid of the class identifier, which was needed to keep the column sorted        
+          ungroup() %>%
+            select("FEMALE") %>% unlist(use.names = F) 
+            # There is one NA Value 
+# we need to replace NA, which is equivalent to zero
+comp_data_lunch[is.na(comp_data_lunch)] <- 0
+
+comp_data_race <- 
+  main_data %>% group_by(gktchid, race) %>% 
+    summarise(n = n(), .groups="drop_last" ) %>% 
+      mutate(share_race = n / sum(n)) %>% 
+        pivot_wider(id_cols =  gktchid, names_from=race, values_from=share_race ) %>%
+            ungroup() %>%
+              select("WHITE/ASIAN") %>% unlist(use.names = F) 
+# we need to replace NA, which is equivalent to zero
+comp_data_race[is.na(comp_data_race)] <- 0
+
+
+comp_data_lunch <- 
+  main_data %>% group_by(gktchid, lunch) %>% 
+    summarise(n = n(), .groups="drop_last" ) %>% 
+      mutate(share_lunch = n / sum(n)) %>% 
+        pivot_wider(id_cols =  gktchid, names_from=lunch, values_from=share_lunch) %>%
+            ungroup() %>%
+              select("1") %>% unlist(use.names = F) 
+# we need to replace NA, which is equivalent to zero
+comp_data_lunch[is.na(comp_data_lunch)] <- 0
+
+# we want double type to account for contionous variables
+# typeof(comp_data_lunch)
 
 ```
+
 
 Get densities values at 100 equidistant evaluation points:
 
@@ -258,7 +293,10 @@ star <- list(Den_gk = clrDenMatrix_1,
              densityID = vecIdent,
              ClassType = listObjClasstype,
              ClassDummy = as.factor(dummyClasstype),
-             School = listObjSchool) 
+             School = listObjSchool,
+             gender = comp_data_gender,
+             race = comp_data_race,
+             lunch = comp_data_lunch) 
 
 # save list as it is the core data for further analysis
 setwd("~/Documents/Projects/2020_Master_STAR/master20/data")
@@ -392,6 +430,7 @@ mod2 <- FDboost(Den_gk ~ 1 + bols(ClassType, intercept = T, df = 4) + bolsc(Scho
 plot(mod2, which = 2, main = "Linear effects for schools", ylim = c(-0.1,0.1))
 ```
 
+Model with continious Covariates
 
 ```{r echo=TRUE}
 # convert the ceofficents from L2 into Bayes Space
