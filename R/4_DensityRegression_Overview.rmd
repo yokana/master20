@@ -336,7 +336,7 @@ There is a set of parameters that need clarification:
 - loss function / `family`
 - step length
 
-We use `bols` to estimate the model with ridge-penalized linear effects for classtype (Brockhaus 2020,p.17, Hofner 2014, p.12ff). `bols` can be used for continues and categorical covariates.
+We use `bols` to estimate the model with ridge-penalized linear effects for classtype (Brockhaus 2020,p.17, Hofner 2014, p.12ff). `bols` can be used for continuous and categorical covariates.
 
 Since the covariate effect is represented as a Kronecker product of two marginal bases (Brockhaus 2020), we combine a linear base learner (`bols`) with a smooth effect estimated by P-splines over all evaluation points of the dependent densities (`bbs`) (Hofner 2014, p. 16). 
 ```{r echo=TRUE}
@@ -350,8 +350,7 @@ mod0 <- FDboost(Den_gk ~ 1,
 # density estimation?
 
 mod1 <- FDboost(Den_gk ~ 1 + bols(ClassType, intercept = T, df = 4),
-               timeformula = ~ bbs(evPoints),
-               offset = "scalar", data = star)
+               timeformula = ~ bbsc(evPoints), data = star)
 # do we need to center classType? (bols vs bolsc), vgl. Hofner 2014,p.12)
 # Intercept should be random at school level??
 # mod1b <- FDboost(Den_gk ~ 1 + bolsc(ClassType, intercept = T, df = 4),
@@ -367,7 +366,7 @@ mod1d <- FDboost(Den_gk ~ 1 + bols(ClassDummy, df = 4) +  bols(classType, df = 4
 
 
 
-plot(mod1, which = 1, main = "Intercept model", ylim = c(-1,1))
+plot(mod1, which = 1, main = "Smooth intercept model", ylim = c(-1,1))
 ```
 
 The Intercept model can be interpreted as the mean (clr)-density (which is not a density since values are still elements of L2 and need to be backtransformed into the Bayes Hilbert Space). The result corresponds to our expectation given the estimation procedure of the student percentiles. 
