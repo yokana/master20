@@ -229,7 +229,6 @@ $$
 
 Since we evaluate the densities along a vector of equidistant points this transformation corresponds to the discrete clr-transformation of compositional variables (See Boogart et al. 2013, p.41, Talska 2018, p. 70).
 
-Since we want to avoid taking logarithms of value zero, we choose our equidistant points from the closed interval $[0.001,0.999]$.
 
 To put it more simply, when we evaluate our densities at equidistant points we get "quasi" compositional data. Then we proceed within the compositional framework. Although this is the most straight forward framework, more complex estimation procedures are proposed (see Talska 2018).[is this correct??]
 
@@ -349,8 +348,8 @@ mod0 <- FDboost(Den_gk ~ 1,
 # does this mean we somehow underestimate values around the boundaries trough our 
 # density estimation?
 
-mod1 <- FDboost(Den_gk ~ 1 + bols(ClassType, intercept = T, df = 4),
-               timeformula = ~ bbsc(evPoints), data = star)
+mod1 <- FDboost(Den_gk ~ 1 + bolsc(ClassType, intercept = T, df = 4),
+               timeformula = ~ bbsc(evPoints, df = 4), data = star)
 # do we need to center classType? (bols vs bolsc), vgl. Hofner 2014,p.12)
 # Intercept should be random at school level??
 # mod1b <- FDboost(Den_gk ~ 1 + bolsc(ClassType, intercept = T, df = 4),
@@ -376,8 +375,7 @@ plot(mod1, which = 2, main = "Linear effects of classtype", ylim = c(-1,1))
 legend("topright", legend=c("wAid", "REG", "SMALL"), pch=16,col=unique(colVec))  
 
 ```
-
-The clr-trsanformed coefficients of the three classtypes shows that SMALL classes have lower (clr)-densities for [.,0.5]-percentiles compared to the other two classtypes.
+Those are random intercept curves for the three classtype levels.
 
 
 
@@ -394,5 +392,26 @@ The clr-trsanformed coefficients of the three classtypes shows that SMALL classe
 # origCoeff <- mod1$coef(which = 2)
 # origCoeff2 <- mod1$coef()$`"bols(ClassType, intercept = T, df = 4) %O% bbs(evPoints)"`
 # transfCoeff <- clrInv(origCoeff)
+
+```
+
+
+## Model Implementation with gam(/refund)
+
+```{r echo=TRUE}
+# library(mgcv)
+# ## built the data for gam (just a loong data.frame with y in one column as for scalar data)
+# datgam <- data.frame(yclr = as.vector(yclr), 
+#                      t = rep(t,N), x = rep(x, each = length(t)), 
+#                      id = rep(factor(1:N), each = length(t)))
+# # in gam we can specify each term by a tensor product representation (see Scheipl et al.2014, p.18)
+# # we can then specify bs (as above), the basis dimensions and the centering constraints
+# model4 <- gam(yclr ~ 0 +
+#                 ti(t, bs = "ps", mc = TRUE, k = 8) + # functional intercept
+#                 ti(x, t, # covariate and time
+#                    bs = c("ps", "ps"), # use B-splines for both
+#                    mc = c(TRUE, TRUE), # sum-to-zero constraints for both x and t
+#                    k = c(8, 8)), # 8 basis functions for both x and t (before constraint)
+#               data = datgam)   
 
 ```
