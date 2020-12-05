@@ -1,0 +1,260 @@
+---
+title: "pffr"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
+---
+
+```{r chunk_setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
+                      eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
+                      fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+```{r echo=FALSE}
+library(tidyverse)
+library(mgcv) # density estimation
+library(refund)
+library(FDboost)
+```
+
+Following, we take a look at Scheipls `pffr` function...following statements are largely copied from Scheipl (2015) Online supplements.
+
+Estimate general models of form (FGAMM):
+
+$$
+{E(Y_i(t)) = g(\mu(t) + \int X_i(s)\beta(s,t)ds + f(z_{1i}, t) + f(z_{2i}) + z_{3i} \beta_3(t) + \dots} )
+$$
+
+We will concetrate on the implementation with scalar covariates ($z_1, z_2$ etc.).
+
+Nonlinear effects of scalar covariate that varies smoothly over t $f(z_{1i}, t$ is implemented by $~s(z1)$. Effects of scalar covariates that are constant over t $f(z_{2i})$ are implemented as $~c(s(z2))$ **or** $\beta_2 z_{2i}$ specified as $~c(z2)$.
+Linear functional effects of scalar covariates that vary smoothly over t $z_{3i} \beta_3(t)$ are specified as $~z3$.
+
+$c()$ notation is used for model terms that are constant over the index of the functional response (as we will probably assume for any random effects). 
+
+`Pffr` transforms univariate smooth terms into bivariate smoothn terms (see *representation as tensor product*) in the original covariate and the index of the functional response (e.g. $ti(t, z)$). Bivariate smooth terms are expanded into trivariate smooth terms in the same way.
+Linear terms for scalar covariates or categorical covariates are expanded into **varying coefficient terms, varying smoothly over the index of the functional response. 
+
+We can use $~-1 + c(1) + ...$ to specify a constant instead of a functional intercept (why would we?).
+
+The functional response has to be supplied as $nxT$ matrices, i.e. each row is one functional observation. The model is then fitted with the data in **long format** (in contrary to a Linear Array Model).
+
+One of the main issues comes with implementing the correct identifiability constraints for GAM with functional response **and** for clr-densities as response. The mgcv default is
+
+- $\sum_{i,t} \hat f(z_i, t) = 0$
+
+This causes problems for models with **multiple functional effects** varying across t. In general we want to use Scheipls constraint s.t. $\sum_i \hat f(z_i, t) = 0$ for all t. This requires a transformation:
+
+- $\hat f(z_i, t) \rightarrow \hat f(z_i, t) - n^{-1} \sum_i \hat f(z_i, t)$ and adding the mean function $n^{-1} \sum_i \hat f(z_i, t)$ to the global functional intercept. This achieves easier interpretability of results.
+
+pffr overrides the mgcv default for tensor product terms whose marginal terms include the index of the functional response. 
+
+It is advised to use centered scalar covariates.
+
+### Identification problem
+
+We have the problem that `pffr` overrides the `mgcv` default constraint but does not give us an option to apply a similar constraint onto the marginal bases in direction of t. Therefore, we need to get back into gam by implementing the unsatisfactory constraint for both marginal bases. This seems to work in Almonds implementation but will probably cause problems for multivariate models. We should check this by a simulation example.
+
+## pffr inputs
+
+- formular as in gam with additional terms from `ff()` and `c()`.
+- yind giving the vector of evaluation points
+- fitter giving the name of estimation function. Default is `gam`, alternatives are `gamm`, `bam`, `gamm4`. depending on the size of the response matrix.
+- method defaults to REML
+- bsy.default giving the parameters of functional response. defaults to $list(bs="ps", m=c(2, 1))$ and further arguments are suppressed.
+- tensortype defaults to t2
+
+retruns pffr-object, which is a modified gam-object.
+
+## Model Covariates
+
+We concentrate on non linear multivariate effects of multiple covariates that vary smoothly over the index of the functional response (clr-densities).
+
+For random effects we consider nonlinear effects of scalar covariates that are constant over t $f(z_{2i})$ specified as $~c(s(z2))$ **or** $\beta_2 z_{2i}$ as $~c(z2)$.
+
+Linear effects $z_{3i} \beta_3(t)$ are simply specified as $~z3$. Linear terms for scalar covariates or categorical covariates are expanded into varying coefficient terms, varying smoothly over the index of the functional response. **For factor variables, a separate smooth function with its own smoothing parameter is estimated for each level of the factor.**
+
+Functional random intercepts $B_{0g(i)}(t)$ are specified as $~s(g, bs="re")$.
+Functional random slopes $u_i B_{1g(i)}(t)$ are speccified as $~s(g, u, bs="re")$.
+
+The **marginal spline basis used for the index of the functional response** is specified via the global argument *bs.yindex*. **This has to be modified for density impementation**. 
+This can be overriden for any specific term by supplying a bs.yindex argument to the term  in the formula, e.g. $~s(x, bs.yindex=list(bs="tp", k=7))$. But by.yindex does **not** take a constraint argument `mc`. 
+
+# Simulation Studies
+
+We can use `pffrSim` to get several Szenarios.
+
+1. Complex multivariate model
+
+$Y_i(t) = μ(t) + \int X_{1i}(s)β_1(s,t)ds + xlin β_3(t) + f(xte1, xte2) + f(xsmoo, t) + β_4 xconst + f(xfactor, t) + ε_i(t)$
+
+We can get all kind of subsets from this data. But what we actually need is data with response densities to check our assumptions. 
+
+Anyway, lets have a look at the basic simulation for a multivariate model with standard functional response and all kind of covariates:
+
+```{r echo=TRUE}
+
+# data2 <- pffrSim(scenario="2", n=200)
+# # t <- attr(data2, "yindex")
+# # s <- attr(data2, "xindex")
+# # we estimate the model without functional covariates
+# # m2 <- pffr(Y ~  
+# #                  xlin  +  #varying coefficient term
+# #                  c(te(xte1, xte2)) + #bivariate smooth term in xte1 & xte2, const. over Y-index
+# #                  s(xsmoo) + #smooth effect of xsmoo varying over Y-index
+# #              c(xconst), # linear effect of xconst constant over Y-index
+# #          data=data2)
+# summary(m2)
+# plot(m2, pers=TRUE)
+```
+
+Input Data is a list with 200 observations of 8 variables. The response is a 200X60 data frame. Non-functional covariates are vectors.
+
+## Implementation Almond
+
+```{r echo=TRUE}
+dbeta2 <- function(x, a, b, ncp = 0, log = FALSE) dbeta(x, a+1, b+1, ncp, log)
+rbeta2 <- function(x, a, b, ncp = 0) rbeta(x, a+1, b+1, ncp)
+# intercept parameters
+a0 <- 3
+b0 <- 3
+# time grid
+t <- seq(0,1, length.out = 50)
+# plot intercept distribution
+# plot(t, dbeta2(t, a0, b0), type = "l")
+# plot(t, dbeta(t, 4, 4), type = "l") 
+
+## specify slope
+slope1 <- 1.3
+slope2 <- 0.5
+slope3 <- 0.7
+
+# sample size
+N <- 51
+
+## sample covariates >-1/(slope*min(a0,b0)) from exponential distribution substracted by the same constant
+set.seed(493822)
+x1 <- rexp(N)-1/(slope1*min(a0, b0))
+# balanced Dummy
+x2 <- rbinom(N,1,0.5)
+x3 <- rexp(N)-1/(slope3*min(a0, b0))
+# range(x)
+# hist(x)
+## determine vectors of true underlying parameters
+a <- a0 + slope1*x1+slope2*x2 + slope3*x3
+b <- b0 + slope1*x1+slope2*x2 + slope3*x3
+
+# change x2 into a factor
+x2 <- as.factor(x2)
+
+n <- 100
+nsamples <- apply(cbind(a,b), 1, function(p) rbeta2(n, p[1], p[2]))
+# use structure to put density objects in a list
+density_esimates <- structure(apply(nsamples, 2, density, bw = .05, n = length(t), from = 0, to = 1))
+# subset each density object 
+# each column is a density; row represents evaluation points
+y <- sapply(density_esimates, function(x) x$y)
+
+## apply the clr-transform of Talska et al. 2017 to get standard L^2 functions
+yclr <- base::scale( log(y), center = TRUE, scale = FALSE )
+
+## Prepare data for FDboost and refund ## 
+dat <- list(yclr = t(yclr), t = t, x1 = x1, x2 = x2, x3 = x3 )
+```
+
+
+
+Model with pffr (problematic) and one continous covariate
+
+```{r echo=TRUE}
+  
+model3 <- pffr( yclr ~ 1 + s(x1, bs = "ps"), yind = t, data = dat, bs.yindex = list(mc = c(TRUE,TRUE)))
+model3$formula
+```
+
+Random Intercept Model does not look bad. But most importantly, we have to check the constraints. **This has to be true for the predicted clr-densities for all t!** -> FDboost does this easily by centering both marginal bases. ´
+
+```{r echo=TRUE}
+  
+dat$yclr_pred <- t(predict(model3))
+stopifnot(max(abs(colSums(dat$yclr_pred))) < 1e-12)
+```
+
+Constraint for respondent clr-densities does not hold.
+
+To understand more, let's look at returned model objects.
+
+1. We have a `pffr` and a `gam`object. 
+
+The `pffr` object contains 14 elements and the `gam` object 56-1 elements. 
+
+```{r echo=TRUE}
+model3$formula  
+
+```
+
+```{r echo=TRUE}
+mod_pffr <- model3$pffr  
+# with termmap we can check the actual call to gam
+mod_pffr$termmap
+```
+
+We actually see that `pffr` calls one constraint: `impose.ffregC` which is the overriden $sum_i f(z_i, t) = 0 \forall t$ constraint. Which means that we can specify this constraint directly in gam?
+In gam the constraint goes into the `xt`call. 
+
+Before we investigate this, let's compare it to the simple univariate model, where we feel pretty safe.
+
+```{r echo=TRUE}
+model1 <- pffr( yclr ~ 1 + s(x1, bs = "ps"), yind = t, data = dat, bs.yindex = list(mc = c(TRUE,TRUE)))
+model1$pffr$termmap
+model1$formula
+```
+
+
+
+```{r echo=TRUE}
+model2 <- pffr( yclr ~ 1 + s(x1, bs = "ps", bs.yindex=list(mc = T)), yind = t, data = dat)  
+model2$pffr$termmap
+```
+
+Here we can see, that the constraint comes from our additional specification within the covariate term. But we were not able to achieve the desired constraint over t. 
+
+Now, lets use the gam implementation:
+
+```{r echo=TRUE}
+datgam <- data.frame(yclr = as.vector(yclr), 
+                     t = rep(t,N), x = rep(x1, each = length(t)), 
+                     id = rep(factor(1:N), each = length(t)))
+modGam <- gam(yclr ~ 0 +
+                ti(t, bs = "ps", mc = TRUE, k = 8) + # functional intercept
+                ti(x, t, # covariate and time
+                            bs = c("ps", "ps"), # use B-splines for both
+                            mc = c(TRUE, TRUE), # sum-to-zero constraints for both x and t
+                            k = c(8, 8)), # 8 basis functions for both x and t (before constraint)
+              data = datgam)
+
+modGam$formula
+```
+
+### Gam Update?
+
+It seems that `pffr` does not override gams defalt anymore. In initial commit 2011 `impose.ffregC` was implemeted as an `xt` argument into `gam`.
+
+1. What is the default constraint in gam?
+2. What is an xt argument?
+
+
+3. Working procedure of `gam` (from helper file)
+
+`gam` first constructs basis functions and penalty coefficient matrices for **each** smooth term obtaining the model matrix for all terms. The identifialbility constraints are implemented at this point. The model is then fit using P-IRLS.
+
+## Tensor product Matrix
+
+```{r echo=TRUE}
+  
+
+```

@@ -1,0 +1,604 @@
+---
+title: "Density-on-scalar regression for class performence"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
+---
+  
+```{r chunk_setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
+                      eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
+                      fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+```{r echo=FALSE}
+library(tidyverse)
+library(mgcv) # density estimation
+library(refund)
+library(FDboost)
+```
+
+# Data
+
+## Simulation Almond
+
+Get Simulation data from Almonds approach:
+
+We specify 50 observations of density functions which are beta functions on the unit intervall with equal parameters a,b , which are a linear function of some covariate `x`, which comes from an exponential distribution. 
+
+The expected effect is that bigger x lead to more concentrated densities. Extreme values of x lead to densities with hugh tails. A beta with parameters a=1, b=1 is a uniform distribution. We control that all function parameters are positive.
+
+Density function of a beta distribution:
+$$
+f(x)={\frac {1}{\mathrm {B} (p,q)}}x^{p-1}(1-x)^{q-1}
+$$
+
+```{r echo=TRUE}
+t <- seq(0,1, length.out = 50)
+# plot intercept distribution
+par(mfrow = c(1,3))
+plot(t, dbeta(t, 3, 3), type = "l", main = "beta with a=3,b=3")
+plot(t, dbeta(t, 2, 2), type = "l", main = "beta with a=2,b=2")  
+plot(t, dbeta(t, 0.5, 0.5), type = "l", main = "beta with a=0.5,b=0.5")  
+```
+
+We then sample 100 points from the **true** density distributions and estimate their *empirical* distributrions, i.e. we introduce some white noise to the dependent densities. 
+
+The the densities, which are part of a **Bayes Hilbert Space** are transformed into the usual **L2 space** of squared integrable functions via a **centered log ratio**-transformation. Below the clr-densities are shown, which are the dependent variables of our simulation model1.
+
+```{r echo=TRUE}
+# bayes-space linear model with beta-distribution-intercept
+# reparametrized distribution function for beta distribution such that shape1-1 = a and shape2-1 = b
+dbeta2 <- function(x, a, b, ncp = 0, log = FALSE) dbeta(x, a+1, b+1, ncp, log)
+rbeta2 <- function(x, a, b, ncp = 0) rbeta(x, a+1, b+1, ncp)
+# intercept parameters
+a0 <- 3
+b0 <- 3
+# time grid
+# t <- seq(0,1, length.out = 50)
+# plot intercept distribution
+# plot(t, dbeta2(t, a0, b0), type = "l")
+# plot(t, dbeta(t, 4, 4), type = "l") 
+
+## specify slope
+slope1 <- 1
+slope2 <- 0.5
+# sample size
+N <- 50
+
+## sample covariates >-1/(slope*min(a0,b0)) from exponential distribution substracted by the same constant
+set.seed(493822)
+x1 <- rexp(50)-1/(slope1*min(a0, b0))
+# balanced Dummy
+x2 <- rbinom(50,1,0.5)
+# range(x)
+# hist(x)
+## determine vectors of true underlying parameters
+a <- slope1*x1*a0+slope2*x2
+b <- slope1*x1*b0+slope2*x2
+
+
+# plot true distribution functions
+# use matplot to plot matrices
+# matplot(t, apply(cbind(a,b), 1, function(p) dbeta2(t, p[1], p[2])), type = "l")
+# paraMatrix <- cbind(a,b)
+# plot(dbeta(t, paraMatrix[1,1], paraMatrix[1,2]), type = "l")
+
+## sample response curves in a realistic procedure by sampling from the corresponding distributions
+# number of samples per density function
+n <- 100
+nsamples <- apply(cbind(a,b), 1, function(p) rbeta2(n, p[1], p[2]))
+# use structure to put density objects in a list
+density_esimates <- structure(apply(nsamples, 2, density, bw = .05, n = length(t), from = 0, to = 1))
+# subset each density object 
+# each column is a density; row represents evaluation points
+y <- sapply(density_esimates, function(x) x$y)
+# # How far are those from the true functions
+# par(mfrow = c(1,2))
+# plot(dbeta(t, paraMatrix[1,1], paraMatrix[1,2]), type = "l")
+# plot(density_esimates[[1]])
+# # there is a bit of noise, but not much => try with smaller n
+
+# # for all
+# par(mfrow = c(1,2))
+# matplot(t, y, type = "l", main = "Sample", ylim = c(0,5))
+# matplot(t, apply(cbind(a,b), 1, function(p) dbeta2(t, p[1], p[2])), type = "l", main = "Truth", ylim = c(0,5))
+# # even though we sample 1000 estimates from each function we still get a lot of noise
+# # what if we only observe around 20 points?
+
+
+## apply the clr-transform of Talska et al. 2017 to get standard L^2 functions
+yclr <- base::scale( log(y), center = TRUE, scale = FALSE )
+# is this equivalent to clr()?
+# clr takes a 
+# test1 <- as.matrix(t(y))
+# test <- clr(test1)
+# # almost identical
+# sum(yclr[,1])
+# sum(test[1,])
+# both some up to zero though
+stopifnot(all(colMeans(yclr)<1e-10))
+matplot(t, yclr, type = "l")  
+dat <- list(yclr = t(yclr), t = t, x1 = x1)  
+```
+
+Clr-constraint should always be checked (see code above).
+
+
+Since the expected value of an exponential is 1, we know that the expected parameters are $1-1/3=2/3$*times*a0. Which is 2 in Almonds example. Therefore the expected mean density is a beta distribution with parameters a and b  equal 2+1. 
+
+Check with bandwidth 0.5 and 100 evaluation points:
+
+```{r echo=TRUE}
+nsamplesT <- rbeta2(n, 1*2/3*a0,1*2/3*b0 )
+# use structure to put density objects in a list
+density_esimatesT <- density(nsamplesT, bw = .05, n = length(t), from = 0, to = 1)
+# subset each density object 
+# each column is a density; row represents evaluation points
+yT <- density_esimatesT$y  
+par(mfrow = c(1,2))
+plot(t,yT, type = "l", main = "Empirical mean distribution", ylim = c(0,2.5))
+plot(t, dbeta2(t,a0,b0), type = "l", main = "mean distribution", ylim = c(0,2.5))
+```
+And its clr transformation:
+
+```{r echo=TRUE}
+yclrT <- base::scale( log(yT), center = TRUE, scale = FALSE )
+plot(t,yclrT, type = "l", main = "Empirical mean clr-distribution")
+```
+
+This can be reproduced by the random intercept model estimated with `FDboost`:
+```{r echo=TRUE}
+model1 <- FDboost(yclr ~ 1 + bolsc(x1, df = 2), timeformula = ~bbsc(t, df = 2), data = dat) # the base-learners bolsc and bbsc correspond to a linear effect bols and a smooth spline effect bbs, but implement a sum-to-zero constraint over the values of x and t, respectively. See ?bolsc, ?bbsc.
+plot(model1, which = 1)
+
+```
+
+It seems convincing that functional model is able to smooth away the white noise that was introduced when we estimated the density from an empirical sample.
+
+A more interesting simulation might be to use the uniform distribution as Intercept distribution.
+
+## STAR data
+
+Open functional data file
+
+```{r echo=TRUE}
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/functionalDataCov.RData")  
+
+```
+
+
+# Theoretical considerations
+
+## Identifying constraints:
+
+In the context of *density* regression, we have to deal with two constraints:
+
+1. The mean effect of each covariate should be zero at each point t (Scheipl et al. 2014: 124):
+$$
+N^{-1} \sum_{i} h_{j}\left(x_{i}\right)(t)=0 \forall t
+$$
+2. Because we are dealing with clr-densities the response needs to be centered as well: (**this needs to be corrected**)
+$$
+N^{-1} \sum_{i} h_{j}\left(y_{i}\right)(t)=0 \forall t
+$$
+
+This is not fullfilled in the `pffr` implementation (see Simulation).
+
+## `pffr`
+
+In `pffr` we can estimate FAMM. 
+
+$$
+E(Y_i(t)) = g(μ(t) + f(z_{1i}, t) + f(z_{2i}) + z_{3i} β_3(t) + … )
+$$
+
+- we can specify a **smooth** intercept, which is equivalent to the mean density (see Data example).
+- specify a *linear effect* of the covariate
+
+The main idea is that we estimate an additive model with a smooth effect of the covariate, which is allowed to vary of the domain of the response. 
+
+That is we define a smooth effect `s(x, bs = "ps", m = c(2,1))` and a tensor product with constraint for the covariate `ti(x, bs = c("ps", "tp"))`; `mc = c(T,F)`. (see `model$formula` for an pffr object)
+
+### Framework: FAMM (Scheipl et al. 2014)
+
+- Functional random effects $b_g(t)$ are smooth functions in t with each group level being represented by a smooth function. That is basically how we represent categorical covariates. 
+
+- For continuous covariates we estimate random fields of f(x) over t and the domain of x.
+
+- The response at t for observation i with $x_i$ is f(x_i,t).
+
+# Simulation
+
+## Model 1
+
+### with pffr
+
+```{r echo=TRUE}
+  
+# model3 <- pffr( yclr ~ 1 + s(x, bs = "ps"), yind = t, data = dat, bs.yindex = list(mc = c(TRUE,TRUE)))
+model3 <- pffr( yclr ~ 1 + s(x1, bs = "ps"), yind = t, data = dat)
+# option has no effect
+# but pffr fails to predict the response function anyway? => check pffr
+```
+
+The option `by.yindex = list(mc=c(T,T))` defines the identifying constraints. Default is `c(T,F)`, which is NOT change by the specification above withing `pffr` option `by.yindex`.
+
+When estimating the model, we can see that the random intercept is correctly estimated:
+
+```{r echo=TRUE}
+# plot(model3, which = 1)
+```
+
+Since pffr is a wrapper we can find the corresponding function call to gam for x1,x2 and Intercept:
+
+s(x1, bs = "ps") 
+"ti(x1, bs = c(\"ps\", \"tp\"), d = c(1, 1), t.vec, mc = c(TRUE, FALSE), m = NA, k = c(8, 8))" 
+                                                                              s(x2, bs = "re") 
+"ti(x2, bs = c(\"re\", \"tp\"), d = c(1, 1), t.vec, mc = c(TRUE, FALSE), m = NA, k = c(8, 8))" 
+                                                                                  Intercept(t) 
+                                              "s(x = t.vec, bs = \"ps\", k = 20, m = c(2, 1))"
+
+
+#### Identification constraint
+
+We can also check the constraints for the model predictions:
+
+```{r echo=TRUE}
+dat$yclr_pred_Modpffr <- predict(model3)  
+summary(colSums(dat$yclr_pred))
+```
+This means that the identification constraint is not fulfilled for every t. 
+
+```{r echo=TRUE}
+# let's check one predicted clr-density
+mean(dat$yclr_pred_Modpffr[1,])  
+```
+**So the mean of each clr-density is zero. Why do we need the constraint to hold for all observations for each t?**
+
+Plot estimated densities from pffr
+
+```{r echo=TRUE}
+yclrpred_Pf <- predict(model3)
+## re-gain and plot predicted densities
+ypred_Pf <- sweep(exp(yclrpred_Pf), 2, colMeans(exp(yclrpred_Pf)), "/")
+par(mfrow = c(1,2))
+matplot(yclrpred_Pf, t = "l") 
+matplot(ypred_Pf, t = "l")  
+
+```
+
+Ok that looks not right. But why?
+
+Anyway, lets proceed with the additional constraint from Almond.
+
+### with mgcv
+
+First, we need to change the data into long format before we can estimate the model
+
+```{r echo=TRUE}
+## built the data for gam (just a loong data.frame with y in one column as for scalar data)
+datgam <- data.frame(yclr = as.vector(yclr), 
+                     t = rep(t,N), x1 = rep(x1, each = length(t)), 
+                     id = rep(factor(1:N), each = length(t)))
+# in gam we can specify each term by a tensor product representation (see Scheipl et al.2014, p.18)
+# we can then specify bs (as above), the basis dimensions and the centering constraints
+model4 <- gam(yclr ~ 0 +
+                ti(t, bs = "ps", mc = TRUE, k = 8) + # functional intercept
+                ti(t, x1, # covariate and time
+                   bs = c("ps", "ps"), # use B-splines for both
+                   mc = c(TRUE, TRUE), # sum-to-zero constraints for both x and t
+                   k = c(8, 8)), # 8 basis functions for both x and t (before constraint)
+              data = datgam)   
+
+```
+
+```{r echo=TRUE}
+## check zero summation
+datgam$yclr_pred <- predict(model4)
+yclrpred_gam <- array(datgam$yclr_pred, dim = dim(yclr))
+stopifnot(max(abs(colSums(yclrpred_gam))) < 1e-12)
+
+## re-gain and plot predicted densities
+ypred_gam <- sweep(exp(yclrpred_gam), 2, colMeans(exp(yclrpred_gam)), "/")
+par(mfrow = c(1,2))
+matplot(ypred_gam, t = "l")
+matplot(yclrpred_gam, t = "l")
+```
+
+# Star Data
+
+## with refund/mgcv
+
+First, we need to transform functional data into long format to work with `mgcv`.
+
+```{r echo=TRUE}
+depDen <- t(star$den_gk)
+depDen_sc <- t(star$den_gk_sc)
+
+# sample s
+datgam <- data.frame(yclr = as.vector(depDen), 
+                     yclr_sc = as.vector(depDen_sc),
+                     t = rep(star$evPoints,nrow(star$den_gk)), classType = rep(star$classType, each = length(star$evPoints)), school = rep(star$School, each = length(star$evPoints)),
+                     gender = rep(star$gender, each = length(star$evPoints)),
+                     lunch = rep(star$lunch, each = length(star$evPoints)),
+                     id = rep(factor(1:nrow(star$den_gk)), each = length(star$evPoints))) 
+
+```
+
+Model implememtation with `mgcv` (returns a `gam` object): 
+
+Basic Model with covariate `classtype`: 
+
+```{r echo=TRUE}
+mod_bas <- gam(yclr ~ 0 +
+                ti(t, bs = "ps", mc = TRUE, k = 20) + # functional intercept -> ends up to be a linear ?
+                ti(classType, t, bs = c("re","tp"), d = c(1,1), mc = c(T,T), k = c(20,20)) , # categorical covariate and time
+              data = datgam)
+summary(mod_bas)
+```
+
+Model with two categorical (already computational intense: around 5-10 minutes):
+
+```{r echo=TRUE}
+# mod_1 <- gam(yclr ~ 0 +
+#                 ti(t, bs = "ps", mc = TRUE, k = 20) + # functional intercept
+#                 ti(classType, t, bs = c("re","tp"), d = c(1,1), mc = c(T,T), k = c(20,20)) +
+#                 ti(school, t, bs = c("re","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)), # categorical covariate and time
+#               data = datgam)
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/modClassSchool.RData")  
+summary(mod_1)
+# save gam object
+# save(mod_1, file = "~/Documents/Projects/2020_Master_STAR/master20/data/modClassSchool.RData")
+```
+R-squared of 0.00607 (mostly by schools) -> our intent is not really to model the whole variance but more to analyse "random" effects of certain covariates
+
+- classType is significant at 0.01 (check SMALL Dummy)
+
+
+Model with two categorical and two continuous covariates (ca. 15 min):
+
+```{r echo=TRUE}
+# mod_2 <- gam(yclr ~ 0 +
+#                 ti(t, bs = "ps", mc = TRUE, k = 20) + # functional intercept
+#                 ti(classType, t, bs = c("re","tp"), d = c(1,1), mc = c(T,T), k = c(20,20)) +
+#                 ti(school, t, bs = c("re","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) +
+#                 ti(gender, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) +
+#                 ti(lunch, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)), data = datgam)
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/modClassSchoolGenLun.RData")
+summary(mod_2)
+# save gam object
+# save(mod_2, file = "~/Documents/Projects/2020_Master_STAR/master20/data/modClassSchoolGenLun.RData")
+```
+
+Devaince explained around 1.4% and all effects are significant. So thats nice.
+
+- Also gender effect could be interpreted as a negative peer effect of highly male dominated classes (iff gender is 1 for male) (axes should be switched)
+  + double check because plot seems to indicate the effect to work in the other direction (higher percentiles in around 0.8)
+- higher share of lunch seems to be associated with lower densities for low percentiles and higher ones for high percentiles (again, we expect that to be the other way around, so check the levels again)
+
+Model with two categorical and two continuous covariates (ca. 10 min):
+
+And out of interest with school-specific densities 
+
+```{r echo=TRUE}
+# mod_3 <- gam(yclr_sc ~ 0 +
+#                 ti(t, bs = "ps", mc = TRUE, k = 20) + # functional intercept
+#                 ti(classType, t, bs = c("re","tp"), d = c(1,1), mc = c(T,T), k = c(20,20)) +
+#                 ti(school, t, bs = c("re","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) +
+#                 ti(gender, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) +
+#                 ti(lunch, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)), data = datgam)
+# 
+# mod_3b <- gam(yclr_sc ~ 0 +
+#                 ti(t, bs = "ps", mc = TRUE, k = 20) + # functional intercept
+#                 ti(classType, t, bs = c("re","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) +
+#                 ti(gender, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) +
+#                 ti(lunch, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)), data = datgam)
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/modClassSchoolGenLun_sc.RData")
+summary(mod_3)
+# save gam object
+# save(mod_3, file = "~/Documents/Projects/2020_Master_STAR/master20/data/modClassSchoolGenLun_sc.RData")
+```
+
+33.5% R-sq. with school factor (which should be insignificant); 16,9 without random effects for schools??
+
+Covariates should be allowed to vary with school factor.
+
+Model with only categorical covariates
+
+```{r echo=TRUE}
+# mod_4 <- gam(yclr ~ 0 +
+#                 ti(t, bs = "ps", mc = TRUE, k = 20) +
+# ti(classType, t, bs = c("re","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) +
+#                 ti(gender, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) +
+#                 ti(lunch, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)), data = datgam)
+# save(mod_4, file = "~/Documents/Projects/2020_Master_STAR/master20/data/modClassGenLun.RData")
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/modClassGenLun.RData")  
+summary(mod_4)
+gam.check(mod_4)
+```
+
+R-sq of 0.28 for model with classtype, gender and lunch. Graphs look good. **Best Model** -> Pronlem seems to arise when we add random effects for school (??).
+Think about it: 
+
+We can check several assumptions with `gam.check`. The p-test is done to check for random residuals, which is clearly violated in our case (Wood: section 5.9 and page 330).
+
+Plot covariates effects:
+
+```{r echo=TRUE}
+plot(mod_4, page = 2)  
+
+```
+
+Intercept Model:
+
+```{r echo=TRUE}
+mod_5 <- gam(yclr ~ 0 +
+                ti(t, bs = "ps", mc = TRUE, k = 20), data = datgam)
+summary(mod_5)
+```
+
+The tensor product fails to estimate the smooth intercept.
+
+We can dig deeper into the construction of smoothers
+```{r echo=TRUE}
+sm <- smoothCon(ti(t, bs = "ps", mc = TRUE, k = 20),data=datgam,knots=NULL)[[1]]  
+# check warning_ reparametrization for margin not done
+dim(sm$X)
+sm$X[1,]
+# so we could check constraints at this point? Compare this step with a simple construction of a gam
+beta <- coef(lm(datgam$yclr~sm$X-1))
+t<- seq(0,1,length=100) ## create prediction times
+Xp <- PredictMat(sm,data.frame(t=t))
+plot(t,Xp%*%beta, type = "l") ## add smooth to plot
+
+```
+
+So the smooth takes a variable and calculates the smooth for the response depending on that variable. 
+-> check FDboost for implementation 
+What we want is a smooth approximation of density values by t, which comes close to the intercept value of f(t) for each t.
+
+NICE!
+
+But does the **additive** Model assume all effects to be orthogonal? That's a pretty ugly assumption for the Star experiment even though we deal with random assignment.
+
+**Interpretation:** When comparing models a higher GCV score suggest a decrease in model quality.
+
+
+Model with isotrophic smooth:
+
+```{r echo=TRUE}
+# mod_6 <- gam(yclr ~ 0 +
+#                 ti(t, bs = "ps", mc = TRUE, k = 20) +
+#                 ti(gender, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) + ti(gender, bs = "ps", mc = T) +
+#                 ti(lunch, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)), data = datgam)
+# save(mod_6, file = "~/Documents/Projects/2020_Master_STAR/master20/data/GenLun.RData")
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/GenLun.RData")
+summary(mod_6)
+gam.check(mod_6)
+```
+Any **by =** specification takes a lot of computational time (as expected). Here we could not estimate it bc of not enough ressources. Anyway, it should be checked if specification was correct first and then repeated with a simpler model.
+
+Easy Model from Wood 2017:
+
+```{r echo=TRUE}
+mod_7 <- gam(yclr ~ school + s(t,k=20,bs="cr",by=school) +
+           s(t,k=40,bs="cr",by=lunch),
+         data=datgam)  
+
+plot(mod_7, scale = 0)
+```
+
+### New Model
+
+For reference we estimate a refund model as well...
+
+```{r echo=TRUE}
+gam_mod1 <- gam(yclr ~ 0 +
+                  ti(t, bs = "ps", mc = TRUE, k = 8) + # functional intercept
+                  ti(school, bs = "re", mc = TRUE) + # random effect
+                  s(t, by = classType, bs = "ps", k = 5, m = c(2,1)) + # factor covariate; no constraint possible => any alternatives?
+                  ti(gender, t, # covariate and time
+                     bs = c("ps", "ps"), # use B-splines for both
+                     mc = c(TRUE, TRUE), # sum-to-zero constraints for both x and t
+                     k = c(8, 8)) + # 8 basis functions for both x and t (before constraint)
+                  ti(lunch, t, # covariate and time
+                     bs = c("ps", "ps"), # use B-splines for both
+                     mc = c(TRUE, TRUE), # sum-to-zero constraints for both x and t
+                     k = c(8, 8)),            
+                  data = datgam) 
+
+```
+
+We see a pretty linear effect for SMALL Classes (as expected), a very small effect for gender (big shares of boys has negative effect on performance distribution), and for lunch we can see the expected effects at the tails.
+
+#### Model Checks and Prediction
+
+```{r echo=TRUE}
+datgam$yclr_pred <- predict(gam_mod1)
+yclr <- dat$yclr
+yclrpred_gam <- array(datgam$yclr_pred, dim = dim(depDen))
+stopifnot(max(abs(colSums(yclrpred_gam))) < 1e-12)
+
+## re-gain and plot predicted densities
+ypred_gam <- sweep(exp(yclrpred_gam), 2, colMeans(exp(yclrpred_gam)), "/")
+## check density constraint
+stopifnot(max(abs(colSums(yclrpred_gam))-1) < 1e-12)
+
+matplot(ypred_gam, t = "l")
+```
+
+We should check the predictions against the original estimation to see if something is off: 
+
+Not done here, but when we compare the pictures we do see that the model does a fine job in smoothing. Consequentily it seems to be easier to compare different types of class performences:
+
+- "egalitarian type"
+- "high achieving type"
+- "underperforming type"
+
+```{r echo=TRUE}
+## compare true curves, data curves, and predicted curves from flexible FDboost and flexible gam model
+ylim <- range(ypred1, y, ypred_gam)
+
+opar <- par(mfrow = c(1,3))
+matplot(t, apply(cbind(a,b), 1, function(p) dbeta2(t, p[1], p[2])), ylim = ylim, type = "l", main = "data consisting of kernel-density-estimates")
+matplot(t, y, type = "l", ylim = ylim, main = "")
+matplot(t, ypred_gam, type = "l", ylim = ylim, main = "predicted densities in flexible gam(/refund) model")
+par(opar)
+
+```
+
+
+### Prediction of prototypes
+
+Additionally, we can also get the **components** of each prediction.
+
+And built inference on the differences between prototypes (p.341) or the parameters in general (thats why we need the coefficients and the prediction Matrix **Xp**).
+
+## Arguments
+
+### Additive Models
+
+The additive assumptions states that the dependent outcome consists of additive parts without the interaction of single terms (smooths).
+In that sense all effects or model terms are estimated seperately (??).
+
+### Tensor product
+
+te(x,t) is basically the same as ti(x) + ti(t) + ti(x,t)
+i.e. the smooth effect of the covariate, the index and their interaction! p.335
+
+Tensor products are a suited choice when the input variables are not on the same scale (p.391)
+
+### Splines
+
+See: https://stat.ethz.ch/R-manual/R-patched/library/mgcv/html/smooth.terms.html
+
+One main point is the specification of random effects within the basis representation with **re**
+
+### Inference
+
+Standard errors are produced by Taylor expansion
+
+
+### Effects
+
+Based on the characteristics of our Modelling assumptions, we expect all covariates have a constant effect over t, since they only effect the density parameters of each distribution (and are measure constant over t). 
+The effects are still smooth over the domain of x -> transformed over the response domain. Here t is not really a dependent factor but more a location parameter. (i.e. constant effects have different results on different locations of the response). *thats why the constraint problem from Scheipl. does not matter) -> we can actually deal with the simpler constraint from Wood.*
+The effect of each covariate is independent of the effect of t (which represents the position within the density).
+
+
+
+# Fragen an Eva
+
+- Was bedeutet die Annahme additativer effect? Werden smooth effects getrennt voneinander berechnet? (dann gibt es eine Model Matrix für jeden effekt) 
+- Erläuterung der Sum-to-Zero beschränkung für abhängige Dichten
+- Model offset: A column of the model matrix with associated parameter fixed at 1 (also eine Basis die direkt übertragen wird?) -> Eine Art vorbestimmer Intercept (also wenn wir feste konstanten zum Model hinzufügen wollen?)
+- allgemein: random intercept (mean distribution); alt. group-specific random intercept
+
+
+Allgemein:
+
+- get **summation convention** of gam
