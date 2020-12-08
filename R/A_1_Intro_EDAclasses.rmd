@@ -1,0 +1,49 @@
+---
+title: "Density-on-scalar regression for class performence"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
+---
+  
+```{r chunk_setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
+                      eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
+                      fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+# Introduction
+
+
+
+## Structure of the model implementation
+
+1. We start with the class-specific performance distributions. That means we treat all student scores as realizations of an underlying smooth class-specific density in the Bayes Hilbert Space. 
+    + choose the test score of interest (depending on Grade and/or subject)
+    + estimate class-specific densities given the student scores
+    This step is crucial, since the estimated densities are the dependent element in our model and any misspecification or measurement error at this step will deteriorate the model quality.   
+2. We treat the estimated densities $f_i$ as noisy realizations of the underlying and unobserved densities in the same way we usually treat each observation $x_i$ as a realization of a random variable $X$.
+
+
+# Data preparation
+
+### Open questions for section
+
+- How many missings? I.e. how many students in gk didn't report a score result in gk?
+- What to do with missings? Right now all students without an reported outcome in gk where dropped.
+
+## Overview class performances
+
+The following table is designed to give an overview of class performance distributions as well as class and school characteristics.
+
+```{r showChoro1}
+htmltools::includeHTML("./Graphs/Table1_wigg.html")
+```
+
+
+
+### Open Questrions for this section
+
+## Randomization tests for covariates

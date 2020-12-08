@@ -1,0 +1,93 @@
+---
+title: "Density-on-scalar regression for class performence"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
+---
+  
+```{r chunk_setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
+                      eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
+                      fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+# (Generalized) functional additive mixed models (Scheipl et al. 2016)
+
+In recent years several approaches have been taken to conceptualize the analysis of functional data in a general framework. This work applies the conceptual framework of Scheipl et al. 2015 to the specific context of a *density-on-scalar* additive regression. Given the nature of the response densities a *functional additive mixed model* for (potentially correlated) Gaussian responses is suitable for our analysis.
+
+Regression models for functional response have been around for quite a while (**see Morris 2015** and chapter [..]), but more conceptual advances have been made recently. Scheipl et al. (2015) introduced an implementation of the *functional additive mixed model* with the R function `pffr()` for the R add-on package `refund`, that made it possible to use several linear and nonlinear types of covariates and account for general correlation structures of the response with the help of functional and scalar random effects.
+
+
+In this chapter, the general model framework is introduced and is related to the specific application of this work. The empirical data application with the R add-on package `gam` (Wood 2017)^[or respectively `refund`] is then presented.
+
+Specifically, we concentrate on a functional additive mixed model with gaussian response and choose a spline-based approach with nonlinear scalar covariates.
+
+## Model 
+
+Our core model has the form of a *structured additive regression model*^[for addive Models see Wood 2017]: 
+
+[formular Scheipl 2015: 2]
+
+We assume that our response can be represented by additive effects which are smooth (or linear) functions of our covariates and some white noise, which is by itself not affected by the covariates. 
+
+$$
+E(Y_i(t)) = g(μ(t) + f(z_{1i}, t) + f(z_{2i}) + z_{3i} β_3(t) + … )
+$$
+
+### Model assumptions
+
+As in standard regression models, we assume the error term to be independent and identically distributed (i.i.d.) Gaussian variables with mean zero and constant variance. That means we (1) need the covariates to be not confounded by anything unspecified with respect to the response [**Formulation - HE**] and (2) that the variation of the errors does not depend on the parameters of the response densities (e.g. higher variance for densities with higher means). 
+
+## Mixed additive Model
+
+
+Mixed models contribute the ability to account for "**curve-specific** random effects to model (co-)variance along t and dependence between functional observations" (Scheipl et al. 2015, p. 2(479)).
+So far, we only apply scalar random effects $b_g$ for the different group levels, which are supposed to follow a normal distribution with mean zero and **general covariance structure** [explain]. 
+Another step is to apply *functional random effects* $b_g(t)$, which are realizations of a mean-zero Gaussian random process. It is further possible to account for more complex nested structures, e.g. class distributions that are nested over schools and repeated measurements and/or subject specific. 
+
+It is important to note that random effects are assumed to be independent.^[The typical group factor for the STAR example is the school level. In general it makes sense to assume that the impact of schools on class performance is an independent realization of the specific context of each school, but we do have additional information about those contexts. Can we implement this information for the random effects?]
+
+
+
+## Tensor product
+
+The central element for our implementation of structured additive regression models with clr-response-densities is a tensor product of marginal bases. For a better understanding, we concentrate on examples with two marginal bases although the extension of more than two is straightforward. 
+
+Each model term can be represented by the tensor product between the marginal bases of the covariate and the marginal bases for the evaluation grid of the response. 
+
+$$
+f_{r}\left(\underset{n T \times 1}{\mathscr{X}_{r}, t}\right) \approx\left(\underset{n T \times K_{x}}{\Phi_{x r}} \odot \underset{n T \times K_{t}}{\Phi_{t r}}\right) \underset{K_{x} K_{t} \times 1}{\theta_{r}}=\Phi_{r} \theta_{r}
+$$
+It makes sense for a comprehensive understanding to look at each part individually. 
+The **grid of evaluation points** is specified as $t=\left(t_{1}, \ldots, t_{T}\right)^{\top}$ with $T$ being the number of points. Since our constructed response is a density on $\mathscr{I}$ and we evaluate the density on the same grid 
+
+
+A **tensor product** is 
+
+
+
+
+## Identifying constraints
+
+In the context of additive models with smooth functions of covariates, we usually deal with an identifiability problem that arises because we can always add a constant to one function and substract it from another and still get exactly the same model fit. To avoid this, we impose a constraint on the model matrix of our covariates. In the general case, it is enough to constraint each additive effects to sum up to zero. But as Scheipl et al. (2015) pointed out, this can cause problems when we are dealing with functional responses evaluated at a vector of observation points. In this context, it is still possible to run into an identificiation problem, since it is now possible to add the sample mean of a smooth effect for one observation point to the *functional intercept* and substract it from the respective effect with the same result. That means in theory we could shift the functional intercept for a specific evaluation point without changing the model fit. For this reason it makes sense to use a constraint that constraints the mean effect to be zero at each observation point t:
+
+$N^{-1} \sum_{i} h_{j}\left(x_{i}\right)(t)=0 \forall t$
+
+As elaborated in chapter [], we should always consider that our respondent densities are elements of a Hilbert Bayes Space and need to be transformed into an L²-space. This results in another constraint, which is technically not an identification problem, but related to the necessary transformation of the response. In order to guarantee that the model does in fact estimate a densities, we need to constraint the clr-response (see Chapter []) to sum up to zero over all t for each observation: $N^{-1} \sum_{i} h_{j}\left(y_{i, t}\right)=0 $
+
+The constraints mentioned above apply to smooth terms that vary along *t*.
+
+## group-specific functional Intercept
+
+Simple linear model with $\beta_{v_{i}}(t)$
+$$
+Y_{i}(t)=\beta_{v_{i}}(t)+E_{i}(t)+\varepsilon_{i t}
+$$
+
+
+# Implementation
+
+The R package `mgcv` does a stepwise model estimation. In a first step the model matrix $X$ is reparametrized and the penalty is applied. Then the identification constraints are applied.
