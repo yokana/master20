@@ -1,0 +1,48 @@
+---
+title: "Density-on-scalar regression for class performence"
+author: "Johannes Wagner"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: yes
+    code_folding: hide
+---
+  
+```{r chunk_setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
+                      eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
+                      fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+
+# Aim of work 
+
+
+
+# Dataset: STAR
+
+## Intro and key facts
+
+## Relevance
+
+### Experimental design
+
+## Research field
+
+## Data preparation
+
+### Exploratory variables
+
+### Dependent variable
+
+# Repetition of previous analyzes
+
+
+
+# Conceptual framework: FAMM
+
+# Density analysis
+
+# Implementation with refund
+
+# To Do's and questions
