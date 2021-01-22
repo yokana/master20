@@ -143,7 +143,7 @@ a0b0estimateclr1 <- predict(fd_mod2, newdata = newdat)[1,]
 a0b0estimate1 <- exp(a0b0estimateclr1)/mean(exp(a0b0estimateclr1))
 
 # in fact a beta(3,3) distribution
-plot(t, dbeta2(t, a0, b0), t = "l", ylim =  lty = 1, main = "True basis density of beta(a0,b0)-distribution \n and predicted density by linear model")
+plot(t, dbeta2(t, a0, b0), t = "l",  lty = 1, main = "True basis density of beta(a0,b0)-distribution \n and predicted density by linear model")
 lines(t, a0b0estimate1, col = "cornflowerblue", lty = 2)
 legend("bottomright", legend = c("true", "predicted"), col = c("black", "cornflowerblue"), lty = 1:2)
 # that could be related to the group factor
@@ -245,9 +245,10 @@ par(opar)
 ## Combine the two
 # re_mod6 <- refund::pffr( yclr ~ 1 + x2 + c(x2) + c(s(group, bs = "re")) + s(x1, bs = "ps") + s(x3, bs = "ps") , yind = t, data = dat_ar)
 
-re_mod6 <- refund::pffr( yclr ~ 1 + x2 + c(s(group, bs = "re")) + s(x1, bs = "ps") + s(x3, bs = "ps") , yind = t, data = dat_ar)
+re_mod6 <- pffr13( yclr ~ 1 + x2 + c(s(group, bs = "re")) + s(x1, bs = "ps") + s(x3, bs = "ps") , yind = t, data = dat_ar)
 re_mod6$formula
 
+test  
 
 yclrpred6 <- t(predict(re_mod6))
 colMeans(yclrpred6)

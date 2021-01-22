@@ -58,7 +58,7 @@ rbeta2 <- function(x, a, b, ncp = 0) rbeta(x, a+1, b+1, ncp)
 a0 <- 3
 b0 <- 3
 # time grid
-# t <- seq(0,1, length.out = 50)
+t <- seq(0,1, length.out = 50)
 # plot intercept distribution
 # plot(t, dbeta2(t, a0, b0), type = "l")
 # plot(t, dbeta(t, 4, 4), type = "l") 
@@ -67,13 +67,13 @@ b0 <- 3
 slope1 <- 1
 slope2 <- 0.5
 # sample size
-N <- 50
+N <- 51
 
 ## sample covariates >-1/(slope*min(a0,b0)) from exponential distribution substracted by the same constant
 set.seed(493822)
-x1 <- rexp(50)-1/(slope1*min(a0, b0))
+x1 <- rexp(N)-1/(slope1*min(a0, b0))
 # balanced Dummy
-x2 <- rbinom(50,1,0.5)
+x2 <- rbinom(N,1,0.5)
 # range(x)
 # hist(x)
 ## determine vectors of true underlying parameters
@@ -218,7 +218,7 @@ That is we define a smooth effect `s(x, bs = "ps", m = c(2,1))` and a tensor pro
 ### with pffr
 
 ```{r echo=TRUE}
-  
+source("pffr2.R")  
 # model3 <- pffr( yclr ~ 1 + s(x, bs = "ps"), yind = t, data = dat, bs.yindex = list(mc = c(TRUE,TRUE)))
 model3 <- pffr( yclr ~ 1 + s(x1, bs = "ps"), yind = t, data = dat)
 # option has no effect
@@ -248,7 +248,7 @@ s(x1, bs = "ps")
 We can also check the constraints for the model predictions:
 
 ```{r echo=TRUE}
-dat$yclr_pred_Modpffr <- predict(model3)  
+dat$yclr_pred_Modpffr <- t(predict(model3))  
 summary(colSums(dat$yclr_pred))
 ```
 This means that the identification constraint is not fulfilled for every t. 
@@ -257,12 +257,12 @@ This means that the identification constraint is not fulfilled for every t.
 # let's check one predicted clr-density
 mean(dat$yclr_pred_Modpffr[1,])  
 ```
-**So the mean of each clr-density is zero. Why do we need the constraint to hold for all observations for each t?**
+
 
 Plot estimated densities from pffr
 
 ```{r echo=TRUE}
-yclrpred_Pf <- predict(model3)
+yclrpred_Pf <- t(predict(model3))
 ## re-gain and plot predicted densities
 ypred_Pf <- sweep(exp(yclrpred_Pf), 2, colMeans(exp(yclrpred_Pf)), "/")
 par(mfrow = c(1,2))
@@ -271,9 +271,6 @@ matplot(ypred_Pf, t = "l")
 
 ```
 
-Ok that looks not right. But why?
-
-Anyway, lets proceed with the additional constraint from Almond.
 
 ### with mgcv
 
@@ -416,9 +413,9 @@ Model with only categorical covariates
 #                 ti(gender, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) +
 #                 ti(lunch, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)), data = datgam)
 # save(mod_4, file = "~/Documents/Projects/2020_Master_STAR/master20/data/modClassGenLun.RData")
-load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/modClassGenLun.RData")  
-summary(mod_4)
-gam.check(mod_4)
+# load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/modClassGenLun.RData")  
+# summary(mod_4)
+# gam.check(mod_4)
 ```
 
 R-sq of 0.28 for model with classtype, gender and lunch. Graphs look good. **Best Model** -> Pronlem seems to arise when we add random effects for school (??).
@@ -429,16 +426,16 @@ We can check several assumptions with `gam.check`. The p-test is done to check f
 Plot covariates effects:
 
 ```{r echo=TRUE}
-plot(mod_4, page = 2)  
+# plot(mod_4, page = 2)  
 
 ```
 
 Intercept Model:
 
 ```{r echo=TRUE}
-mod_5 <- gam(yclr ~ 0 +
-                ti(t, bs = "ps", mc = TRUE, k = 20), data = datgam)
-summary(mod_5)
+# mod_5 <- gam(yclr ~ 0 +
+#                 ti(t, bs = "ps", mc = TRUE, k = 20), data = datgam)
+# summary(mod_5)
 ```
 
 The tensor product fails to estimate the smooth intercept.
@@ -475,21 +472,21 @@ Model with isotrophic smooth:
 #                 ti(t, bs = "ps", mc = TRUE, k = 20) +
 #                 ti(gender, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)) + ti(gender, bs = "ps", mc = T) +
 #                 ti(lunch, t, bs = c("ps","tp"), d = c(1,1), mc = c(T,T), k = c(8,8)), data = datgam)
-# save(mod_6, file = "~/Documents/Projects/2020_Master_STAR/master20/data/GenLun.RData")
-load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/GenLun.RData")
-summary(mod_6)
-gam.check(mod_6)
+# # save(mod_6, file = "~/Documents/Projects/2020_Master_STAR/master20/data/GenLun.RData")
+# load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/GenLun.RData")
+# summary(mod_6)
+# gam.check(mod_6)
 ```
 Any **by =** specification takes a lot of computational time (as expected). Here we could not estimate it bc of not enough ressources. Anyway, it should be checked if specification was correct first and then repeated with a simpler model.
 
 Easy Model from Wood 2017:
 
 ```{r echo=TRUE}
-mod_7 <- gam(yclr ~ school + s(t,k=20,bs="cr",by=school) +
-           s(t,k=40,bs="cr",by=lunch),
-         data=datgam)  
-
-plot(mod_7, scale = 0)
+# mod_7 <- gam(yclr ~ school + s(t,k=20,bs="cr",by=school) +
+#            s(t,k=40,bs="cr",by=lunch),
+#          data=datgam)  
+# 
+# plot(mod_7, scale = 0)
 ```
 
 ### New Model
@@ -509,7 +506,7 @@ gam_mod1 <- gam(yclr ~ 0 +
                      bs = c("ps", "ps"), # use B-splines for both
                      mc = c(TRUE, TRUE), # sum-to-zero constraints for both x and t
                      k = c(8, 8)),            
-                  data = datgam) 
+                  data = datgam, method="REML") 
 
 ```
 
@@ -541,11 +538,10 @@ Not done here, but when we compare the pictures we do see that the model does a 
 
 ```{r echo=TRUE}
 ## compare true curves, data curves, and predicted curves from flexible FDboost and flexible gam model
-ylim <- range(ypred1, y, ypred_gam)
+ylim <- range(y, ypred_gam)
 
-opar <- par(mfrow = c(1,3))
+opar <- par(mfrow = c(1,2))
 matplot(t, apply(cbind(a,b), 1, function(p) dbeta2(t, p[1], p[2])), ylim = ylim, type = "l", main = "data consisting of kernel-density-estimates")
-matplot(t, y, type = "l", ylim = ylim, main = "")
 matplot(t, ypred_gam, type = "l", ylim = ylim, main = "predicted densities in flexible gam(/refund) model")
 par(opar)
 

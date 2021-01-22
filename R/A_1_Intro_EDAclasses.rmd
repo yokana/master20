@@ -24,7 +24,16 @@ knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F,
     + choose the test score of interest (depending on Grade and/or subject)
     + estimate class-specific densities given the student scores
     This step is crucial, since the estimated densities are the dependent element in our model and any misspecification or measurement error at this step will deteriorate the model quality.   
-2. We treat the estimated densities $f_i$ as noisy realizations of the underlying and unobserved densities in the same way we usually treat each observation $x_i$ as a realization of a random variable $X$.
+2. We treat the estimated densities $f_i$ with $i = 1,..,N$ as noisy realizations of the underlying and unobserved densities in the same way we usually treat each observation $x_i$ as a realization of a random variable $X$. In this sense, the estimated densities are realizations of a conditional distribution^[FAMM framework assumes the response distribution to be a Gaussian. This is not correct in our case. What alternatives does GFAMM offer?] and we are interested in the partial effects of a number of relevant covariates. 
+3. We transform the estimated densities $f_i$ by the centered-log-ratio (clr) transformation (Booghart). Since the clr-transformation is bijective every estimated density has its clr-density and every clr-density can be backtransformed into its respective density. 
+    + clr-transformation for densities: 
+
+$$ 
+{clr}_{\lambda}[\mu]:=\operatorname{clr}_{\lambda}\left[f_{\mu}\right]:=\log f_{\mu}-\frac{1}{\lambda(\mathcal{T})} \cdot \int_{\mathcal{T}} \log f_{\mu} \mathrm{d} \lambda
+$$
+    + The transformed clr-density is an element of the space of square integratable functions and fullfills $\int_{\mathcal{T}} \operatorname{clr}[f] \mathrm{d} \lambda=0$ (Eva-Maria Maier, chapter 2.2)
+4. We can now specify and estimate the *density-on-scalar* regression model, which uses the clr-densities as functional response in a (generalized) functional additive mixed model (GFAMM) framework. 
+5. Given the inferential framework the model can be evaluated. 
 
 
 # Data preparation

@@ -135,8 +135,8 @@ for (i in 1:length(vecIdent)){
   temp <- main_data %>% 
     select(school_by_type, perc_av_gk, perc_av_gk_sc) %>% 
     filter(school_by_type==vecIdent[i])
-  densities[[i]] <- kdensity(temp$perc_av_gk, start = "uniform", kernel = "beta_biased", bw = 0.1)
-  densities_sc[[i]] <- kdensity(temp$perc_av_gk, start = "uniform", kernel = "beta_biased", bw = 0.1)
+  densities[[i]] <- kdensity(temp$perc_av_gk, start = "uniform", kernel = "beta", bw = 0.1)
+  densities_sc[[i]] <- kdensity(temp$perc_av_gk, start = "uniform", kernel = "beta", bw = 0.1)
   }  
 ```
 
@@ -145,8 +145,8 @@ To get a rough idea of the data, we plot the estimated densities by `classtype`:
 ```{r echo=TRUE}
 ## we can use a vector of classtypes for coloring the corresponding plot
 colVec <- factor(str_sub(vecIdent, start = 8))
-plot(densities_sc[[1]], ylim = c(0,6), col = colVec[1])
-legend("topright", legend=c("SMALL", "REG", "wAID"), pch=16,col=unique(colVec))
+plot(densities_sc[[1]], ylim = c(0,6), xlim = c(0,1), col = colVec[1])
+legend("center", legend=c("SMALL", "REG", "wAID"), pch=16,col=unique(colVec))
 for (i in 2:length(densities)){
   lines(densities[[i]], col=colVec[i])
 }
@@ -211,7 +211,7 @@ denMatrix_1 <- matrix(data = NA, nrow = length(densities), ncol = numPoints)
 # for school specific densities
 denMatrix_2 <- matrix(data = NA, nrow = length(densities_sc), ncol = numPoints)
 
-eqdist <- seq(0.001,0.999,length.out = numPoints)  
+eqdist <- seq(0,1,length.out = numPoints)  
 
 for (i in 1:length(densities)){
   denMatrix_1[i,] <- densities[[i]](eqdist)

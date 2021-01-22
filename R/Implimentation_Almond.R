@@ -52,7 +52,7 @@ plot(dbeta(t, paraMatrix[1,1], paraMatrix[1,2]), type = "l")
 
 ## sample response curves in a realistic procedure by sampling from the corresponding distributions
 # number of samples per density function
-n <- 1000
+n <- 100
 nsamples <- apply(cbind(a,b), 1, function(p) rbeta2(n, p[1], p[2]))
 # use structure to put density objects in a list
 density_esimates <- structure(apply(nsamples, 2, density, bw = .05, n = length(t), from = 0, to = 1))
@@ -163,7 +163,9 @@ model2 <- FDboost(yclr ~ 1+ bbsc(x, df = 2), timeformula = ~bbsc(t, df = 2), dat
 plot(model2, which = 2)
 # offset remains the same
 # effects are more distinct but overall ppicture remains the same
-
+coefList <- coef(model1)
+coefList[1]$offset$value
+# returns a grid of 40 points 
 
 yclrpred2 <- t(predict(model2))
 stopifnot(all(colMeans(yclrpred2)<1e-10))
@@ -197,17 +199,31 @@ legend("bottomright", legend = c("true", "linear model", "flexible model"), col 
 
 library(refund)
 ## Not clear how to implement the sum-to-zero constraint also for the development over time in pffr
+# in pffr the sum-to-zero constraint only accounts for each t separately
 model3 <- pffr( yclr ~ 1 + s(x, bs = "ps"), yind = t, data = dat, bs.yindex = list(mc = c(TRUE,TRUE)))
+# model formular as in FDboost with s() being the wrapper for a linear affect of contionious x with P-Splines
+# yind gives the Grid
+# bs.yindex: parameters for splines bases for functional response
+## default: B-splines with 5 dimensions of bases and first order difference penalty
+## mc defines the centering constraints for the two marginals (but here it is only defined for response? -> How does this work?)
+
+
 # i.e. we would need mc = c(TRUE,TRUE) in the mgcv formula:
 model3$formula
 ## -> so manually specify the function in mgcv::gam (pffr is a wrapper for gam)
 # 
-coef(model3)
+## check zero summation
+dat$yclr_pred <- predict(model3)
+stopifnot(max(abs(colSums(dat$yclr_pred))) < 1e-12)
+# here constraint is not fulfilled (that is the updated constraint from Scheipl et al (2014))
+
 library(mgcv)
 ## built the data for gam (just a loong data.frame with y in one column as for scalar data)
 datgam <- data.frame(yclr = as.vector(yclr), 
                      t = rep(t,N), x = rep(x, each = length(t)), 
                      id = rep(factor(1:N), each = length(t)))
+# in gam we can specify each term by a tensor product representation (see Scheipl et al.2014, p.18)
+# we can then specify bs (as above), the basis dimensions and the centering constraints
 model4 <- gam(yclr ~ 0 +
                 ti(t, bs = "ps", mc = TRUE, k = 8) + # functional intercept
                 ti(x, t, # covariate and time
@@ -215,6 +231,8 @@ model4 <- gam(yclr ~ 0 +
                    mc = c(TRUE, TRUE), # sum-to-zero constraints for both x and t
                    k = c(8, 8)), # 8 basis functions for both x and t (before constraint)
               data = datgam) 
+# implimentation of a random effect in gam is the same as in pffr
+
 
 ## check zero summation
 datgam$yclr_pred <- predict(model4)
@@ -235,7 +253,7 @@ matplot(t, y, type = "l", ylim = ylim, main = "data consisting of kernel-density
 matplot(t, ypred_gam, type = "l", ylim = ylim, main = "predicted densities in flexible gam(/refund) model")
 par(opar)
 
-# Comparing the two different approaches, the FDboost regression model seems to perform slightly worse at the borders of the domain.
+# Comparing the two different approaches, the FDboost regression model seems to perform slightly worse at the borders of the domain (not if we decrease number of observations per distribution).
 # However, this might be due to the unspecified stopping iteration in the boosting algorithm defaulting to mstop = 100. 
 # This is of special relevance, as in the present case, 
 # where a relatively simple model is fitted and perfectly specified, the optimal mstop is expected to be much higher. 

@@ -62,17 +62,18 @@ $$
 f_{r}\left(\underset{n T \times 1}{\mathscr{X}_{r}, t}\right) \approx\left(\underset{n T \times K_{x}}{\Phi_{x r}} \odot \underset{n T \times K_{t}}{\Phi_{t r}}\right) \underset{K_{x} K_{t} \times 1}{\theta_{r}}=\Phi_{r} \theta_{r}
 $$
 It makes sense for a comprehensive understanding to look at each part individually. 
-The **grid of evaluation points** is specified as $t=\left(t_{1}, \ldots, t_{T}\right)^{\top}$ with $T$ being the number of points. Since our constructed response is a density on $\mathscr{I}$ and we evaluate the density on the same grid 
+The **grid of evaluation points** is specified as $t=\left(t_{1}, \ldots, t_{T}\right)^{\top}$ with $T$ being the number of points. Since our constructed responses are densities on $\mathscr{I}$ and the clr-transformation is bijective, we can estimate our model under the assumption of identical grids. 
 
 
-A **tensor product** is 
+[**crude formulation**] One way to understand the tensor^[i.e. multidimensional array of numbers] product operator is to see it as a way to take two marginal basis $(e_1,...,e_m)$ and $(f_1,...,f_n)$ of two vector spaces $V$ and $W$ (over the same field) and combine them into the $mn$-basis $e_{i} \otimes f_{j}$ of $V \otimes W$. 
+From a simplified computational perspective that can be translated into the **outer product** of two coordinate vectors $v \in V$ and $w \in W$ over the corresponding bases (Wikipedia english). 
 
 
 
 
 ## Identifying constraints
 
-In the context of additive models with smooth functions of covariates, we usually deal with an identifiability problem that arises because we can always add a constant to one function and substract it from another and still get exactly the same model fit. To avoid this, we impose a constraint on the model matrix of our covariates. In the general case, it is enough to constraint each additive effects to sum up to zero. But as Scheipl et al. (2015) pointed out, this can cause problems when we are dealing with functional responses evaluated at a vector of observation points. In this context, it is still possible to run into an identificiation problem, since it is now possible to add the sample mean of a smooth effect for one observation point to the *functional intercept* and substract it from the respective effect with the same result. That means in theory we could shift the functional intercept for a specific evaluation point without changing the model fit. For this reason it makes sense to use a constraint that constraints the mean effect to be zero at each observation point t:
+In the context of additive models with smooth functions of covariates, we usually deal with an identifiability problem that arises because we can always add a constant to one function and subtract it from another and still get exactly the same model fit. To avoid this, we impose a constraint on the model matrix of our covariates. In the general case, it is enough to constraint each additive effects to sum up to zero. But as Scheipl et al. (2015) pointed out, this can cause problems when we are dealing with functional responses evaluated at a vector of observation points. In this context, it is still possible to run into an identification problem, since it is now possible to add the sample mean of a smooth effect for one observation point to the *functional intercept* and subtract it from the respective effect with the same result. That means in theory we could shift the functional intercept for a specific evaluation point without changing the model fit. For this reason it makes sense to use a constraint that constraints the mean effect to be zero at each observation point t:
 
 $N^{-1} \sum_{i} h_{j}\left(x_{i}\right)(t)=0 \forall t$
 

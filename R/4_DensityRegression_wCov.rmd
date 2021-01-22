@@ -84,13 +84,13 @@ plot(h3, freq=TRUE, ylab="Relative Frequency", ylim = c(0,0.10))
 
 ```{r echo=TRUE}
 # make a list to store all densities
-SizeTypeDensities <- vector("list", length = length(groupList)-1)
+SizeTypeDensities <- vector("list", length = length(groupList))
 # ignore first value of List since it is NA
-for (i in 2:length(groupList)){
+for (i in 1:length(groupList)){
   temp <- main_data %>% 
     select(gkclasstype, perc_av_gk) %>% 
     filter(gkclasstype==groupList[i])
-  SizeTypeDensities[[i-1]] <- kdensity(temp$perc_av_gk, start = "uniform", kernel = "beta_biased", support = c(0,1), na.rm = T, bw = 0.05)}  
+  SizeTypeDensities[[i]] <- kdensity(temp$perc_av_gk, start = "uniform", kernel = "beta_biased", support = c(0,1), na.rm = T, bw = 0.05)}  
 par(mfrow = c(1,3))
 plot(SizeTypeDensities[[2]], ylim = c(0.5,1.5), main = "Small Classes")
 plot(SizeTypeDensities[[3]], ylim = c(0.5,1.5), main = "Regular Classes")
@@ -112,7 +112,7 @@ One big adventage of the distributional perspective is that enables the research
 In addition, there are several parameters for kernel estimation that we need to tune carefully (see `?kdensity`):
 
 - optimal bandwidth: so far user supplied
-- parametric start: "gumbel"
+- parametric start: "uniform"
 - kernel: "beta_biased" as the recommended bias-corrected kernel for use on unit interval
 
 Estimation:
@@ -207,7 +207,7 @@ comp_data_gender <-
             select("FEMALE") %>% unlist(use.names = F) 
             # There is one NA Value 
 # we need to replace NA, which is equivalent to zero
-comp_data_lunch[is.na(comp_data_lunch)] <- 0
+comp_data_gender[is.na(comp_data_gender)] <- 0
 
 comp_data_race <- 
   main_data %>% group_by(gktchid, race) %>% 
@@ -287,12 +287,12 @@ We combine the dependent vectors and the covariates into a list object
 
 
 # create a list with all variables for functional analysis  
-star <- list(Den_gk = clrDenMatrix_1, 
-             Den_gk_sc = clrDenMatrix_2,
+star <- list(den_gk = clrDenMatrix_1, 
+             den_gk_sc = clrDenMatrix_2,
              evPoints = eqdist,
              densityID = vecIdent,
-             ClassType = listObjClasstype,
-             ClassDummy = as.factor(dummyClasstype),
+             classType = listObjClasstype,
+             classDummy = as.factor(dummyClasstype),
              School = listObjSchool,
              gender = comp_data_gender,
              race = comp_data_race,
@@ -311,9 +311,9 @@ At first, we can plot all class-specific densities into one plot and for specifi
 
 ```{r echo=TRUE}
 # get the densities
-depDens <- star$Den_gk_sc
+depDens <- star$den_gk_sc
 evPoints <- star$evPoints
-classType <- star$ClassType
+classType <- star$classType
 plot(evPoints,as.double(depDens[1,]), type="l", ylim = c(-20,15), col = colVec[1])
 legend("topright", legend=c("SMALL", "REG", "wAID"), pch=16,col=unique(colVec))
 for (i in 2:nrow(depDens)){
@@ -385,7 +385,7 @@ We use `bolsc` to estimate the model with ridge-penalized linear effects for cla
 
 Since the covariate effect is represented as a Kronecker product of two marginal bases (Brockhaus 2020), we combine a linear base learner (`bols`) with a smooth effect by P-splines over all evaluation points of the dependent densties (`bbs`) (Hofner 2014, p. 16). 
 ```{r echo=TRUE}
-mod0 <- FDboost(Den_gk ~ 1,
+mod0 <- FDboost(den_gk ~ 1,
                timeformula = ~ bbs(evPoints, df = 4),
                offset_control = o_control(k_min = 40), # doesnt change our curve
                offset = "scalar", data = star)
@@ -394,7 +394,7 @@ mod0 <- FDboost(Den_gk ~ 1,
 # does this mean we somehow underestimate values around the boundaries trough our 
 # density estimation?
 
-mod1 <- FDboost(Den_gk ~ 1 + bols(ClassType, intercept = T, df = 4),
+mod1 <- FDboost(den_gk ~ 1 + bols(classType, intercept = T, df = 4),
                timeformula = ~ bbs(evPoints),
                offset = "scalar", data = star)
 # do we need to center classType? (bols vs bolsc), vgl. Hofner 2014,p.12)
@@ -402,7 +402,7 @@ mod1 <- FDboost(Den_gk ~ 1 + bols(ClassType, intercept = T, df = 4),
 # mod1b <- FDboost(Den_gk ~ 1 + bolsc(ClassType, intercept = T, df = 4),
 #                timeformula = ~ bbs(evPoints),
 #                offset = "scalar", data = star)
-mod1c <- FDboost(Den_gk ~ 1 + bols(ClassDummy, df = 4),
+mod1c <- FDboost(den_gk ~ 1 + bols(classDummy, df = 4),
                timeformula = ~ bbs(evPoints),
                offset = "scalar", data = star)
 # coefficients are evaluated at 24 points, which can be retrieved
@@ -423,14 +423,24 @@ legend("bottomright", legend=c("OTHER", "SMALL"), pch=16,col=unique(colVec))
 Model with school effects
 
 ```{r echo=TRUE}
-mod2 <- FDboost(Den_gk ~ 1 + bols(ClassType, intercept = T, df = 4) + bolsc(School, intercept = T, df = 4),
+mod2 <- FDboost(den_gk ~ 1 + bols(classType, intercept = T, df = 4) + bols(School, intercept = F, df = 4),
                timeformula = ~ bbs(evPoints),
-               offset = "scalar", data = star)  
+               offset = "scalar", data = star)
 
-plot(mod2, which = 2, main = "Linear effects for schools", ylim = c(-0.1,0.1))
+plot(mod2, which = 2, main = "Linear effects for classtype", ylim = c(-0.1,0.1))
+plot(mod2, which = 3, main = "Linear effects for schools", ylim = c(-0.1,0.1))
 ```
 
-Model with continious Covariates
+
+
+
+Model with continuous Covariates
+
+```{r echo=TRUE}
+  
+
+```
+
 
 ```{r echo=TRUE}
 # convert the ceofficents from L2 into Bayes Space
