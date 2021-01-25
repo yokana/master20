@@ -5,6 +5,7 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document:
     toc: yes
+    toc_depth: 4
     code_folding: hide
 ---
   
@@ -12,6 +13,20 @@ output:
 knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F, 
                       eval=T, cache.rebuild=F, cache=F, R.options=list(width=120), 
                       fig.width=8, fig.align = 'center', dev.args=list(bg = 'transparent'), dev='svglite')
+```
+
+```{r echo=FALSE, include=FALSE}
+library(tidyverse)
+library(doBy)
+library(broom)
+library("data.table")
+library(magrittr) 
+library(gtools) # various programming tools
+library("robCompositions") # for compData analysis
+library(compositions)
+library(ggplot2) # for plots
+library(gridExtra) # for several plots in one window
+library(expss) # to assign var labels
 ```
 
 
@@ -34,6 +49,76 @@ knitr::opts_chunk$set(echo = T, message=F, warning=F, comment=NA, autodep=F,
 ### Exploratory variables
 
 ### Dependent variable
+
+Test scores are usually the measure of choice for evaluating school performance of students. As already said, the aim of the work is to identify factors that influence school performance. In contrast to previous studies the entire distribution of test performance within each class is to be considered. To quantify the relative test performance, it is advisable to use percentiles (@Krüger 2001).
+
+As a first step, the average values of the test results for the subjects math, reading and writing are calculated. This can later be used as a raw (and possible problematic) measurement of a students ability to perform in tests.
+
+```{r echo=TRUE}
+# rename our dataset  
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/STAR_Students.RData")
+# rename and drop observation with only NAs
+main_data <- x %>% filter(!is.na(stdntid))
+# Compute Raw average Scores as a new Variable of Interest
+main_data <- 
+  main_data %>% mutate(gkaversc = (gktmathss + gktreadss + gkwordskillss)/3, g1aversc = (g1tmathss + g1treadss + g1wordskillss)/3, g2aversc = (g2tmathss + g2treadss + g2wordskillss)/3, g3aversc = (g3tmathss + g3treadss + g3wordskillss)/3)  
+```
+
+For easier data manipulation the dataset is split by student grades, which can either be kindergarden (*gk*), first grade (*g1*), second grade (*g2*) or third grade (*g3*).  
+
+```{r echo=TRUE}
+main_data_gk <- 
+  main_data %>% filter(X=="YES")
+main_data_g1 <- 
+  main_data %>% filter(X=="YES" | X.1=="YES")
+main_data_g2 <- 
+  main_data %>% filter(X=="YES" | X.1=="YES" | X.2=="YES")
+main_data_g3 <- 
+  main_data %>% filter(X=="YES" | X.1=="YES" | X.2=="YES" | X.3=="YES")
+```  
+
+#### Percentile ranks (see Krüger 2011)
+
+In the following, the calculation steps for calculating ranking positions are replicated according to the Krüger template. Brief explanations can be found inside the code.
+
+Percentage ranks are first computed for all students in regular classes and then the students, who were assigned to small classes, are given their ranks **relative** to the ranks of the distribution of regular students. Test scores are available for math, reading and word comprehension. Following, the mean values for each group of students and each subject are displayed. The `percent_rank()` function from the `dplyr` package was used for the computation of `perc_[subject]_[grade]` variables. The function gives the lower percentile rank to students with equal score.^[This explains why the mean values for regular students (baseline) are lower than 0.5.]  
+
+```{r echo=TRUE}
+# See Krüger_199, p. 506ff
+# select data from students in regular classes without any missing scores
+reg_scores_gk <- 
+  main_data_gk %>% filter(gkclasstype=="REGULAR CLASS" | gkclasstype=="REGULAR + AIDE CLASS", !is.na(gktmathss) & !is.na(gktreadss) & !is.na(gkwordskillss) ) %>%
+    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid, gkaversc)
+
+# Select data from students in small classes
+small_scores_gk <- 
+  main_data_gk %>% filter(gkclasstype=="SMALL CLASS", !is.na(gktmathss) & !is.na(gktreadss) & !is.na(gkwordskillss) )  %>%
+    select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid, gkaversc  )
+
+# calculate the percentile ranks for each subject and for the average score from the raw average test result
+# This is done for every student in a regular class
+reg_scores_gk <- 
+  reg_scores_gk %>% mutate(perc_maths_gk=percent_rank(gktmathss), perc_read_gk =percent_rank(gktreadss), perc_word_gk=percent_rank(gkwordskillss), perc_av_gk=percent_rank(gkaversc))
+
+# Following Krüger, we calculate the percentile scores for students in small classes relative to the population of students in regular classes
+scores_gk <- reg_scores_gk
+
+for (i in 1:nrow(small_scores_gk)) {
+  # select ith observation
+  obs <- small_scores_gk[i,]
+  # add to regular observations and compute percentile ranks
+  temp <- add_row(reg_scores_gk, obs) %>% 
+    mutate(perc_maths_gk=percent_rank(gktmathss), perc_read_gk =percent_rank(gktreadss), perc_word_gk=percent_rank(gkwordskillss), perc_av_gk=percent_rank(gkaversc))
+  # add observation to merged scores
+  scores_gk <-  add_row(scores_gk, tail(temp,1))
+}
+
+
+# Calculate Summary Statistics (See: Krüger (1999), p. 508)
+scores_gk %>% 
+  filter(gkclasstype=="REGULAR CLASS" | gkclasstype=="REGULAR + AIDE CLASS") %>%
+    summarise(mean_av = mean(perc_av_gk), mean_math = mean(perc_maths_gk), mean_read = mean(perc_read_gk), mean_word = mean(perc_word_gk))
+```
 
 # Repetition of previous analyzes
 
