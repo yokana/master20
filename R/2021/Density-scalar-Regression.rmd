@@ -47,7 +47,135 @@ library(sm) # for plotting densities
 
 ## Data preparation
 
+The first step is to load the STAR dataset and recode relavent variables for the purposes of our analysis.
+
+```{r echo=TRUE}
+# rename our dataset  
+load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/STAR_Students.RData")
+# rename and drop observation with only NAs
+main_data <- x %>% filter(!is.na(stdntid))
+```
+
+
 ### Exploratory variables
+
+#### Entry Levels for each student
+
+Krüger controls for entry levels and schools, since random assignment took place within schools and there are several arguments that entry level has an effect on the strength of the treatment variable.
+
+```{r echo=TRUE}
+main_data <- 
+  main_data %>% 
+  mutate(entry_level = ifelse(X=="YES",1,0)) %>% 
+    mutate(entry_level = ifelse(X.1=="YES" & X=="NO",2,entry_level)) %>% 
+      mutate(entry_level = ifelse(X.2=="YES" & X=="NO" & X.1=="NO",3,entry_level))  %>% 
+        mutate(entry_level = ifelse(X.3=="YES" & X=="NO" & X.1=="NO" & X.2=="NO",4,entry_level)) 
+main_data$entry_level <- factor(main_data$entry_level, labels=c("Kindergarten", "1st Grade", "2nd Grade", "3rd Grade"))
+# create Fixed effects for school-by-entry-wave effects (see Krüger 2001)
+# 4 levels
+
+main_data <- 
+  main_data %>% mutate(school_at_entry = ifelse(entry_level=="Kindergarten", gkschid, 0)) %>%
+    mutate(school_at_entry = ifelse(entry_level=="1st Grade", g1schid, school_at_entry)) %>%
+      mutate(school_at_entry = ifelse(entry_level=="2nd Grade", g2schid, school_at_entry)) %>%
+        mutate(school_at_entry = ifelse(entry_level=="3rd Grade", g3schid, school_at_entry))
+main_data$school_at_entry <- factor(main_data$school_at_entry) 
+# attributes(main_data$school_at_entry)
+# 79 levels
+```
+
+Create Krügers school by entry fixed effects:
+
+```{r echo=TRUE}
+# make a factor variable, which combines the two informations to get an interaction effect
+# this is "school_by_entry_wave" variable (see Krüger 1999)
+main_data$school_by_entry <- with(main_data, interaction(school_at_entry, entry_level))
+```
+
+
+#### Race
+
+The variable `race` is coded into 3 factors: White/Asian, Black, Other
+
+At first, for students:
+
+```{r echo=TRUE}
+# Change the levels of var race
+main_data$race <-  recode_factor(main_data$race, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+summary(main_data$race)
+```
+
+Secondly, for teachers:
+
+```{r echo=TRUE}
+# Change the levels of var race for Teacher in Kindergarten
+main_data$gktrace <-  recode_factor(main_data$gktrace, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+
+# and for 1st,2nd and 3rd Grade
+main_data$g1trace <-  recode_factor(main_data$g1trace, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+main_data$g2trace <-  recode_factor(main_data$g2trace, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+main_data$g3trace <-  recode_factor(main_data$g3trace, `WHITE`="WHITE/ASIAN", `BLACK`="BLACK", `ASIAN`="WHITE/ASIAN", .default = "OTHER")
+
+# Give statistics for Kindergarten Teachers
+summary(main_data$gktrace)
+```
+
+#### Free lunch 
+
+This recodes the grade specific free lunch variables into one Dummy indicating overall `free lunch` status.
+
+```{r echo=TRUE}
+main_data <-  main_data %>% mutate(lunch = ifelse(entry_level=="Kindergarten" & gkfreelunch=="FREE LUNCH",1, ifelse(entry_level=="1st Grade" & g1freelunch=="FREE LUNCH",1, ifelse(entry_level=="2nd Grade" & g2freelunch=="FREE LUNCH", 1,ifelse(entry_level=="3rd Grade" & g3freelunch=="FREE LUNCH",1 , 0)))))   
+
+summary(main_data$lunch)
+```
+
+#### Classtype
+
+The three classtypes are recoded as a dummy variable. This is just done for easier computation of later regression models and else.
+
+We compute the actual classtype by entree wave^[This procedure is advisable since some students switch their assigned classtype during their school time, which violates the central assumption of random assignment. Therefore it makes sense to check for the entry level assigment and not the actual class. The number of those cases is very small though (see Krüger 2001)]:
+
+
+```{r echo=TRUE}
+main_data <- 
+  main_data %>% mutate(smallDu = ifelse(entry_level=="Kindergarten" & gkclasstype=="SMALL CLASS",1 , ifelse(entry_level=="1st Grade" & g1classtype=="SMALL CLASS",1, ifelse(entry_level=="2nd Grade" & g2classtype=="SMALL CLASS",1, ifelse(entry_level=="3rd Grade" & g3classtype=="SMALL CLASS",1,0)))))
+
+main_data <- 
+  main_data %>% mutate(regAidDu = ifelse(entry_level=="Kindergarten" & gkclasstype=="REGULAR + AIDE CLASS",1 , ifelse(entry_level=="1st Grade" & g1classtype=="REGULAR + AIDE CLASS",1, ifelse(entry_level=="2nd Grade" & g2classtype=="REGULAR + AIDE CLASS",1, ifelse(entry_level=="3rd Grade" & g3classtype=="REGULAR + AIDE CLASS",1,0)))))
+
+summary(main_data$smallDu); summary(main_data$regAidDu)
+```
+
+#### Teachers education
+
+Following Krüger, teacher education is recoded as a DUMMY for Master degree or higher. Summary Statistics are displayed for each grade (k-3):
+
+```{r echo=TRUE}
+# create a Dummy for Master or Higher
+main_data <- 
+  main_data %>% 
+    mutate(gktdegree = ifelse(gkthighdegree=="MASTERS" |gkthighdegree=="MASTER +" | gkthighdegree=="SPECIALIST" |gkthighdegree=="DOCTORAL",1,0), g1tdegree = ifelse(g1thighdegree=="MASTERS" |g1thighdegree=="MASTER +" | g1thighdegree=="SPECIALIST" |g1thighdegree=="DOCTORAL",1,0), g2tdegree = ifelse(g2thighdegree=="MASTERS" |g2thighdegree=="MASTER +" | g2thighdegree=="SPECIALIST" |g2thighdegree=="DOCTORAL",1,0), g3tdegree = ifelse(g3thighdegree=="MASTERS" |g3thighdegree=="MASTER +" | g3thighdegree=="SPECIALIST" |g3thighdegree=="DOCTORAL",1,0))
+
+summary(main_data$gktdegree); summary(main_data$g1tdegree); summary(main_data$g2tdegree); summary(main_data$g3tdegree)
+```
+
+
+
+#### School ID
+
+School ID is recoded as a factor variable.
+
+```{r echo=TRUE}
+main_data$gkschid <- factor(main_data$gkschid)
+main_data$g1schid <- factor(main_data$g1schid)
+main_data$g2schid <- factor(main_data$g2schid)
+main_data$g3schid <- factor(main_data$g3schid)
+# attributes(main_data$gkschid)
+
+attributes(main_data$gkschid)
+```
+
 
 ### Dependent variable
 
@@ -56,10 +184,6 @@ Test scores are usually the measure of choice for evaluating school performance 
 As a first step, the average values of the test results for the subjects math, reading and writing are calculated. This can later be used as a raw (and possible problematic) measurement of a students ability to perform in tests.
 
 ```{r echo=TRUE}
-# rename our dataset  
-load("/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/STAR_Students.RData")
-# rename and drop observation with only NAs
-main_data <- x %>% filter(!is.na(stdntid))
 # Compute Raw average Scores as a new Variable of Interest
 main_data <- 
   main_data %>% mutate(gkaversc = (gktmathss + gktreadss + gkwordskillss)/3, g1aversc = (g1tmathss + g1treadss + g1wordskillss)/3, g2aversc = (g2tmathss + g2treadss + g2wordskillss)/3, g3aversc = (g3tmathss + g3treadss + g3wordskillss)/3)  
@@ -78,13 +202,15 @@ main_data_g3 <-
   main_data %>% filter(X=="YES" | X.1=="YES" | X.2=="YES" | X.3=="YES")
 ```  
 
-#### Percentile ranks (see Krüger 2011)
+#### Percentile ranks
 
 In the following, the calculation steps for calculating ranking positions are replicated according to the Krüger template. Brief explanations can be found inside the code.
 
 Percentage ranks are first computed for all students in regular classes and then the students, who were assigned to small classes, are given their ranks **relative** to the ranks of the distribution of regular students. Test scores are available for math, reading and word comprehension. Following, the mean values for each group of students and each subject are displayed. The `percent_rank()` function from the `dplyr` package was used for the computation of `perc_[subject]_[grade]` variables. The function gives the lower percentile rank to students with equal score.^[This explains why the mean values for regular students (baseline) are lower than 0.5.]  
 
-##### Percentile rank distributions
+In this version, I computed percentiles for average test results differently from Krügers suggestion. Instead of calculating the rank of a students as the average of his or her subject specific ranks, the average of the subject-specific test scores was computed and then each (regular) got assigned to his or her school specific rank. 
+
+##### Percentile rank (Krüger)
 
 Due to the nature of percentiles the rank distribution of regular students should follow a uniform distribution. 
 
@@ -415,12 +541,13 @@ This approach diverges from Krüger et al. 2001, but might be helpful since it d
 
 We expect percentile ranks for regular students within schools to follow a uniform distribution. Again the Variation in distribution of test scores from students in small classes is of interest.
 
-```{r echo=TRUE}
+The computation is the same as before, but this time the data is grouped by school ID.
 
+```{r echo=TRUE}
+# select relevant variables
 small_scores_gk_sc <- 
   main_data_gk %>% filter(gkclasstype=="SMALL CLASS", !is.na(gktmathss) & !is.na(gktreadss) & !is.na(gkwordskillss) )  %>%
     select(stdntid,gkclasstype,gktmathss,gktreadss, gkwordskillss, gkschid, gkaversc  )
-
 
 # We simply repeat the procedure with data grouped by school 
 reg_scores_gk_sc <- 
@@ -530,8 +657,81 @@ main_data <-
   main_data %>% full_join(scores_all_sc, by="stdntid")
 ```
 
+### Saving the dataset
 
+The the code below variable labels are assigned to the new variables.
 
+```{r echo=TRUE}
+# Average test scores
+attributes(main_data$gkaversc) <- list(comment = "Average test score in kindergarten")   
+attributes(main_data$g1aversc) <- list(comment = "Average test score in Grade1") 
+attributes(main_data$g2aversc) <- list(comment = "Average test score in Grade2") 
+attributes(main_data$g3aversc) <- list(comment = "Average test score in Grade3") 
+# percentiles of whole distribution
+attributes(main_data$perc_maths_gk) <- list(comment = "Percentile Math over all STAR students in kindergarten")   
+attributes(main_data$perc_maths_g1) <- list(comment = "Percentile Math over all STAR students in Grade1")   
+attributes(main_data$perc_maths_g2) <- list(comment = "Percentile Math over all STAR students in Grade2")   
+attributes(main_data$perc_maths_g3) <- list(comment = "Percentile Math over all STAR students in Grade3")   
+attributes(main_data$perc_read_gk) <- list(comment = "Percentile Reading over all STAR students in kindergarten")   
+attributes(main_data$perc_read_g1) <- list(comment = "Percentile Reading over all STAR students in Grade1")   
+attributes(main_data$perc_read_g2) <- list(comment = "Percentile Reading over all STAR students in Grade2")   
+attributes(main_data$perc_read_g3) <- list(comment = "Percentile Reading over all STAR students in Grade3")  
+attributes(main_data$perc_word_gk) <- list(comment = "Percentile Word comprehension over all STAR students in kindergarten")   
+attributes(main_data$perc_word_g1) <- list(comment = "Percentile Word comprehension over all STAR students in Grade1")   
+attributes(main_data$perc_word_g2) <- list(comment = "Percentile Word comprehension over all STAR students in Grade2")   
+attributes(main_data$perc_word_g3) <- list(comment = "Percentile Word comprehension over all STAR students in Grade3") 
+attributes(main_data$perc_av_gk) <- list(comment = "Percentile average score over all STAR students in kindergarten")   
+attributes(main_data$perc_av_g1) <- list(comment = "Percentile average score  over all STAR students in Grade1")   
+attributes(main_data$perc_av_g2) <- list(comment = "Percentile average score  over all STAR students in Grade2")   
+attributes(main_data$perc_av_g3) <- list(comment = "Percentile average score  over all STAR students in Grade3") 
+# percentiles within schools
+attributes(main_data$perc_maths_gk_sc) <- list(comment = "Percentile Math within schools in kindergarten")   
+attributes(main_data$perc_maths_g1_sc) <- list(comment = "Percentile Math within schools in Grade1")   
+attributes(main_data$perc_maths_g2_sc) <- list(comment = "Percentile Math within schools in Grade2")   
+attributes(main_data$perc_maths_g3_sc) <- list(comment = "Percentile Math within schools in Grade3")   
+attributes(main_data$perc_read_gk_sc) <- list(comment = "Percentile Reading within schools in kindergarten")   
+attributes(main_data$perc_read_g1_sc) <- list(comment = "Percentile Reading within schools in Grade1")   
+attributes(main_data$perc_read_g2_sc) <- list(comment = "Percentile Reading within schools in Grade2")   
+attributes(main_data$perc_read_g3_sc) <- list(comment = "Percentile Reading within schools in Grade3")  
+attributes(main_data$perc_word_gk_sc) <- list(comment = "Percentile Word comprehension within schools in kindergarten")   
+attributes(main_data$perc_word_g1_sc) <- list(comment = "Percentile Word comprehension within schools in Grade1")   
+attributes(main_data$perc_word_g2_sc) <- list(comment = "Percentile Word comprehension within schools in Grade2")   
+attributes(main_data$perc_word_g3_sc) <- list(comment = "Percentile Word comprehension within schools in Grade3") 
+attributes(main_data$perc_av_gk_sc) <- list(comment = "Percentile average score within schools in kindergarten")   
+attributes(main_data$perc_av_g1_sc) <- list(comment = "Percentile average score  within schools in Grade1")   
+attributes(main_data$perc_av_g2_sc) <- list(comment = "Percentile average score  within schools in Grade2")   
+attributes(main_data$perc_av_g3_sc) <- list(comment = "Percentile average score  within schools in Grade3") 
+# label race variable for students
+attributes(main_data$race) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Student race in 3 categories", class = c("ordered", "factor"))
+# label race variable for teachers by class
+attributes(main_data$gktrace) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Teacher race kindergarten in 3 categories", class = c("ordered", "factor"))
+attributes(main_data$g1trace) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Teacher race grade1 in 3 categories", class = c("ordered", "factor"))
+attributes(main_data$g2trace) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Teacher race grade2 in 3 categories", class = c("ordered", "factor"))
+attributes(main_data$g3trace) <- list(levels = c("WHITE/ASIAN", "BLACK", "OTHER"), comment = "Teacher race grade3 in 3 categories", class = c("ordered", "factor"))
+# label entry level
+attributes(main_data$entry_level) <- list(comment = "Indikator at which grade student entered STAR", levels=levels(main_data$entry_level), class=class(main_data$entry_level))
+# label school at entryy
+attributes(main_data$school_at_entry) <- list(comment = "Indikator which school student was attending when entering STAR", levels=levels(main_data$school_at_entry), class=class(main_data$school_at_entry))
+# label school by entree
+attributes(main_data$school_by_entry) <- list(comment = "Indikator for school and entry level student when entering STAR", levels=levels(main_data$school_by_entry), class=class(main_data$school_by_entry))
+# label class type dummies
+attributes(main_data$smallDu) <- list(comment = "Dummy for students who entered STAR in a small class")
+attributes(main_data$regAidDu) <- list(comment = "Dummy for students who entered STAR in a regular class with Aides")
+# label teacher education dummy_ Master or higehr for each grade
+attributes(main_data$gktdegree) <-  list(comment = "Dummy for teacher with Master degree or higher in kindergarten")
+attributes(main_data$g1tdegree) <-  list(comment = "Dummy for teacher with Master degree or higher in grade1")
+attributes(main_data$g2tdegree) <-  list(comment = "Dummy for teacher with Master degree or higher in grade2")
+attributes(main_data$g3tdegree) <-  list(comment = "Dummy for teacher with Master degree or higher in grade3")
+# label lunch dummy
+attributes(main_data$lunch) <-  list(comment = "Dummy for students with FREE LUNCH status when the joined STAR")
+#
+```
+
+Let's save the manipulated data sets for later access.
+
+```{r echo=TRUE}
+save(main_data, file = "/home/johannes/Documents/Projects/2020_Master_STAR/master20/data/main_data.RData")    
+```
 
 
 # Repetition of previous analyzes
